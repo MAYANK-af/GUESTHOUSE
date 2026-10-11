@@ -3,7 +3,6 @@
 > A modern, full-featured Guest House Management System built with **React 18**, **TypeScript**, **Tailwind CSS**, and **Supabase / Local Offline Engine**. Featuring Indian Rupee (₹ / INR) localization, authentic guest & staff registries, real-time room availability, interactive reservation calendar, and automated reporting.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-GitHub_Pages-2ea44f?style=for-the-badge&logo=github)](https://mayank-af.github.io/GUESTHOUSE/)
-[![Open in Bolt](https://img.shields.io/badge/Open_in-Bolt.new-007ACC?style=for-the-badge&logo=lightning)](https://bolt.new/p/71930407)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
@@ -14,7 +13,6 @@
 ## 🌐 Live Application Links
 
 - 🚀 **Live Demo on GitHub Pages**: [https://mayank-af.github.io/GUESTHOUSE/](https://mayank-af.github.io/GUESTHOUSE/)
-- ⚡ **Bolt.new Project**: [https://bolt.new/p/71930407](https://bolt.new/p/71930407)
 - 📦 **GitHub Repository**: [https://github.com/MAYANK-af/GUESTHOUSE](https://github.com/MAYANK-af/GUESTHOUSE)
 
 ---
