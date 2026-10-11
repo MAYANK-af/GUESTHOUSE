@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Booking, type Guest, type Room } from '@/lib/supabase';
-import { BarChart3, Download, Filter, Calendar, TrendingUp, DollarSign, BedDouble, Users } from 'lucide-react';
+import { BarChart3, Download, Filter, Calendar, TrendingUp, IndianRupee, BedDouble, Users } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 
 export default function Reports() {
@@ -153,8 +153,8 @@ export default function Reports() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Bookings', value: filtered.length, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
-          { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Collected', value: `$${paidRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-violet-600 bg-violet-50' },
+          { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString('en-IN')}`, icon: IndianRupee, color: 'text-emerald-600 bg-emerald-50' },
+          { label: 'Collected', value: `₹${paidRevenue.toLocaleString('en-IN')}`, icon: TrendingUp, color: 'text-violet-600 bg-violet-50' },
           { label: 'Total Nights', value: totalNights, icon: BedDouble, color: 'text-amber-600 bg-amber-50' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card p-5">
@@ -174,11 +174,11 @@ export default function Reports() {
       {pendingRevenue > 0 && (
         <div className="card p-4 flex items-center gap-3 bg-amber-50/50">
           <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-            <DollarSign className="w-4 h-4 text-amber-600" />
+            <IndianRupee className="w-4 h-4 text-amber-600" />
           </div>
           <div>
             <p className="text-sm font-semibold text-amber-900">Pending Payments</p>
-            <p className="text-xs text-amber-700">${pendingRevenue.toLocaleString()} awaiting collection</p>
+            <p className="text-xs text-amber-700">₹{pendingRevenue.toLocaleString('en-IN')} awaiting collection</p>
           </div>
         </div>
       )}
@@ -206,7 +206,7 @@ export default function Reports() {
                   <td className="px-4 py-3 text-sm text-slate-600 capitalize">{room.room_type}</td>
                   <td className="px-4 py-3 text-sm text-slate-700 text-center">{bookingCount}</td>
                   <td className="px-4 py-3 text-sm text-slate-700 text-center">{nights}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">${revenue.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">₹{revenue.toLocaleString('en-IN')}</td>
                 </tr>
               ))}
             </tbody>
@@ -247,7 +247,7 @@ export default function Reports() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700 text-center">{emp.bookings}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">${emp.revenue.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">₹{emp.revenue.toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -285,7 +285,7 @@ export default function Reports() {
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">{booking.assigned_by ?? '—'}</td>
                   <td className="px-4 py-3"><StatusBadge status={booking.status} /></td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-900 text-right">${booking.total_amount ?? 0}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-900 text-right">₹{(booking.total_amount ?? 0).toLocaleString('en-IN')}</td>
                 </tr>
               ))}
             </tbody>

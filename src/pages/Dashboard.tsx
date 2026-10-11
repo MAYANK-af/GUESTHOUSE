@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Room, type Booking, type Guest } from '@/lib/supabase';
-import { Hotel, CalendarCheck, Users, TrendingUp, ArrowUpRight, ArrowDownRight, DollarSign, BedDouble, Wrench, Clock } from 'lucide-react';
+import { Hotel, CalendarCheck, Users, TrendingUp, ArrowUpRight, ArrowDownRight, IndianRupee, BedDouble, Wrench, Clock } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 
 export default function Dashboard() {
@@ -93,11 +93,11 @@ export default function Dashboard() {
         <div className="card p-6 lg:col-span-1">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
+              <IndianRupee className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Monthly Revenue</p>
-              <p className="text-2xl font-bold text-slate-900">${monthlyRevenue.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-slate-900">₹{monthlyRevenue.toLocaleString('en-IN')}</p>
             </div>
           </div>
           <div className="space-y-3 mt-6">
@@ -189,7 +189,7 @@ export default function Dashboard() {
                   {room.room_type === 'double' ? <BedDouble className="w-4 h-4 text-slate-400" /> : <Hotel className="w-4 h-4 text-slate-400" />}
                 </div>
                 <StatusBadge status={room.status} />
-                <p className="text-xs text-slate-400 mt-2">${room.price_per_night}/night</p>
+                <p className="text-xs text-slate-400 mt-2">₹{room.price_per_night.toLocaleString('en-IN')}/night</p>
               </div>
             ))}
           </div>

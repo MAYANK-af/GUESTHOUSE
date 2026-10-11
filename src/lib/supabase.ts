@@ -1,14 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
+import { createMockClient } from './mockSupabase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+const isRealSupabase = supabaseUrl && 
+  supabaseUrl.startsWith('http') && 
+  !supabaseUrl.includes('placeholder') && 
+  supabaseAnonKey && 
+  !supabaseAnonKey.includes('placeholder');
+
+export const supabase: any = isRealSupabase
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
+  : createMockClient();
 
 export type UserRole = 'admin' | 'staff' | 'duty_manager';
 

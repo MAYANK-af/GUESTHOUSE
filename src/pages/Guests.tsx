@@ -203,35 +203,35 @@ export default function Guests() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">First Name</label>
-              <input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-field" placeholder="John" />
+              <input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input-field" placeholder="Aarav" />
             </div>
             <div>
               <label className="label-field">Last Name</label>
-              <input type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-field" placeholder="Smith" />
+              <input type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-field" placeholder="Sharma" />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="john@example.com" />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="aarav.sharma@tcs.com" />
             </div>
             <div>
               <label className="label-field">Phone</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field" placeholder="+1 555 0123" />
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field" placeholder="+91 98201 23456" />
             </div>
           </div>
           <div>
             <label className="label-field">Address</label>
-            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="input-field" placeholder="123 Main St, City" />
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="input-field" placeholder="Flat 402, Powai, Mumbai" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">ID / Passport Number</label>
-              <input type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className="input-field" placeholder="AB1234567" />
+              <input type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className="input-field" placeholder="IND-A482910" />
             </div>
             <div>
               <label className="label-field">Company</label>
-              <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="input-field" placeholder="Company name" />
+              <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="input-field" placeholder="Tata Consultancy Services" />
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
@@ -266,7 +266,7 @@ export default function Guests() {
                 </div>
                 <div className="text-right">
                   <StatusBadge status={booking.status} />
-                  {booking.total_amount && <p className="text-xs text-slate-500 mt-1">${booking.total_amount}</p>}
+                  {booking.total_amount && <p className="text-xs text-slate-500 mt-1">₹{booking.total_amount.toLocaleString('en-IN')}</p>}
                 </div>
               </div>
             ))}

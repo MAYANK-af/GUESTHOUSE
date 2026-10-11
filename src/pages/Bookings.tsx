@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, type Booking, type Guest, type Room, type BookingStatus, type PaymentStatus } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { Plus, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, X, Loader2, DollarSign, User, BedDouble, Trash2, Pencil } from 'lucide-react';
+import { Plus, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, X, Loader2, IndianRupee, User, BedDouble, Trash2, Pencil } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -340,7 +340,7 @@ export default function Bookings() {
               <label className="label-field">Room</label>
               <select required value={roomId} onChange={(e) => setRoomId(e.target.value)} className="input-field">
                 <option value="">Select room...</option>
-                {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number} ({r.room_type}) — ${r.price_per_night}/night</option>)}
+                {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number} ({r.room_type}) — ₹{r.price_per_night.toLocaleString('en-IN')}/night</option>)}
               </select>
             </div>
           </div>
@@ -382,7 +382,7 @@ export default function Bookings() {
               <input type="text" value={assignedBy} onChange={(e) => setAssignedBy(e.target.value)} className="input-field" placeholder="Employee name" />
             </div>
             <div>
-              <label className="label-field">Total Amount ($)</label>
+              <label className="label-field">Total Amount (₹)</label>
               <input type="number" step="0.01" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} className="input-field" placeholder="Auto-calculated if empty" />
             </div>
           </div>

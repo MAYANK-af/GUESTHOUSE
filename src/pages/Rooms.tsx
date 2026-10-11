@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, type Room, type RoomStatus, type RoomType } from '@/lib/supabase';
-import { Plus, Pencil, Trash2, Hotel, BedDouble, Wrench, Search, Loader2, DollarSign, Building } from 'lucide-react';
+import { Plus, Pencil, Trash2, Hotel, BedDouble, Wrench, Search, Loader2, IndianRupee, Building } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -175,8 +175,8 @@ export default function Rooms() {
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1.5 text-slate-700">
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-                <span className="font-semibold">{room.price_per_night}</span>
+                <IndianRupee className="w-4 h-4 text-emerald-600" />
+                <span className="font-semibold">{room.price_per_night.toLocaleString('en-IN')}</span>
                 <span className="text-xs text-slate-400">/night</span>
               </div>
               <select
@@ -228,8 +228,8 @@ export default function Rooms() {
             </div>
           </div>
           <div>
-            <label className="label-field">Price per Night ($)</label>
-            <input type="number" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="input-field" placeholder="75.00" />
+            <label className="label-field">Price per Night (₹)</label>
+            <input type="number" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="input-field" placeholder="2500" />
           </div>
           <div>
             <label className="label-field">Notes</label>

@@ -265,16 +265,23 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
--- SEED DATA: Sample rooms
+-- SEED DATA: Sample rooms & guests (INR Pricing & Indian Context)
 -- ============================================================
 INSERT INTO rooms (room_number, room_type, floor, status, price_per_night, notes) VALUES
-  ('101', 'single', 1, 'available', 75.00, 'Standard single room with garden view'),
-  ('102', 'single', 1, 'available', 75.00, 'Standard single room with garden view'),
-  ('103', 'double', 1, 'available', 120.00, 'Spacious double room with en-suite'),
-  ('201', 'single', 2, 'available', 85.00, 'Deluxe single room with balcony'),
-  ('202', 'double', 2, 'available', 140.00, 'Deluxe double room with city view'),
-  ('203', 'double', 2, 'maintenance', 140.00, 'Deluxe double room - currently under renovation'),
-  ('301', 'single', 3, 'available', 90.00, 'Premium single room with mountain view'),
-  ('302', 'double', 3, 'available', 160.00, 'Premium double room with Jacuzzi'),
-  ('303', 'double', 3, 'available', 160.00, 'Premium double room with Jacuzzi')
+  ('101', 'single', 1, 'occupied', 2500.00, 'Ground floor, garden view'),
+  ('102', 'single', 1, 'available', 2500.00, 'Standard single room'),
+  ('103', 'single', 1, 'available', 2800.00, 'Corner room with study desk'),
+  ('201', 'double', 2, 'reserved', 4500.00, 'King size bed, balcony'),
+  ('202', 'double', 2, 'available', 4500.00, 'Deluxe double room'),
+  ('203', 'double', 2, 'available', 5000.00, 'Deluxe double with patio'),
+  ('301', 'double', 3, 'occupied', 6500.00, 'Executive Suite, panoramic view'),
+  ('302', 'double', 3, 'maintenance', 6500.00, 'AC repair in progress by duty manager')
 ON CONFLICT (room_number) DO NOTHING;
+
+INSERT INTO guests (id, first_name, last_name, email, phone, address, id_number, company) VALUES
+  ('a1111111-1111-4111-8111-111111111111', 'Aarav', 'Sharma', 'aarav.sharma@tcs.com', '+91 98201 23456', 'Flat 402, Powai, Mumbai', 'IND-A482910', 'Tata Consultancy Services'),
+  ('a2222222-2222-4222-8222-222222222222', 'Priya', 'Patel', 'priya.patel@infosys.com', '+91 97123 45678', '12th Cross, Indiranagar, Bengaluru', 'IND-B992341', 'Infosys Ltd'),
+  ('a3333333-3333-4333-8333-333333333333', 'Rohan', 'Verma', 'rohan.verma@wipro.com', '+91 99887 65432', 'Sector 45, Gurugram', 'IND-C771290', 'Wipro Technologies'),
+  ('a4444444-4444-4444-8444-444444444444', 'Ananya', 'Iyer', 'ananya.iyer@hcl.com', '+91 98450 11223', 'Anna Salai, T. Nagar, Chennai', 'IND-D123984', 'HCL Technologies'),
+  ('a5555555-5555-4555-8555-555555555555', 'Vikram', 'Singh', 'vikram.singh@reliance.com', '+91 98112 34567', 'BKC, Bandra, Mumbai', 'IND-E556789', 'Reliance Industries')
+ON CONFLICT (id) DO NOTHING;

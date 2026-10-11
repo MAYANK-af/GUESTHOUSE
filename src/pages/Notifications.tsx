@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Notification, type NotificationType } from '@/lib/supabase';
-import { Bell, CheckCheck, Trash2, Calendar, LogIn, LogOut, DollarSign, Wrench, Info, Filter } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Calendar, LogIn, LogOut, IndianRupee, Wrench, Info, Filter } from 'lucide-react';
 
 const typeConfig: Record<NotificationType, { icon: typeof Bell; color: string; bg: string }> = {
   booking_confirmation: { icon: Calendar, color: 'text-sky-600', bg: 'bg-sky-50' },
   check_in_alert: { icon: LogIn, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   check_out_alert: { icon: LogOut, color: 'text-amber-600', bg: 'bg-amber-50' },
-  payment_reminder: { icon: DollarSign, color: 'text-red-600', bg: 'bg-red-50' },
+  payment_reminder: { icon: IndianRupee, color: 'text-red-600', bg: 'bg-red-50' },
   maintenance: { icon: Wrench, color: 'text-violet-600', bg: 'bg-violet-50' },
   general: { icon: Info, color: 'text-slate-600', bg: 'bg-slate-50' },
 };

@@ -113,7 +113,7 @@ export default function AuthPage() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="input-field pl-10"
-                      placeholder="John Smith"
+                      placeholder="Rajesh Sharma"
                     />
                   </div>
                 </div>
@@ -178,6 +178,37 @@ export default function AuthPage() {
                 {mode === 'signin' ? 'Sign In' : 'Create Account'}
               </button>
             </form>
+
+            {mode === 'signin' && (
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 text-center">
+                  Instant Demo Access
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => signIn('admin@guesthouse.com', 'password')}
+                    className="py-2 px-2 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-300 text-slate-700 shadow-sm transition-all text-center"
+                  >
+                    👑 Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => signIn('staff@guesthouse.com', 'password')}
+                    className="py-2 px-2 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-300 text-slate-700 shadow-sm transition-all text-center"
+                  >
+                    👔 Staff
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => signIn('manager@guesthouse.com', 'password')}
+                    className="py-2 px-2 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-300 text-slate-700 shadow-sm transition-all text-center"
+                  >
+                    🔧 Manager
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 text-center text-sm text-slate-500">
               {mode === 'signin' ? (
