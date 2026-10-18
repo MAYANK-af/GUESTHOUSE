@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { can, PAGE_PERMISSION } from '@/lib/permissions';
 import { Building2, LayoutDashboard, Hotel, CalendarDays, Users, BarChart3, Bell, LogOut, Menu, X, Shield } from 'lucide-react';
 
 export type PageKey = 'dashboard' | 'rooms' | 'bookings' | 'guests' | 'reports' | 'notifications';
@@ -23,6 +24,7 @@ const navItems: { key: PageKey; label: string; icon: typeof LayoutDashboard }[] 
 export default function Layout({ currentPage, onNavigate, children, unreadCount }: LayoutProps) {
   const { profile, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const visibleNav = navItems.filter(({ key }) => can(profile?.role, PAGE_PERMISSION[key]));
 
   const roleColors: Record<string, string> = {
     admin: 'bg-violet-100 text-violet-700',
@@ -45,7 +47,7 @@ export default function Layout({ currentPage, onNavigate, children, unreadCount 
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ key, label, icon: Icon }) => (
+          {visibleNav.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => onNavigate(key)}
@@ -116,7 +118,7 @@ export default function Layout({ currentPage, onNavigate, children, unreadCount 
               </button>
             </div>
             <nav className="flex-1 px-3 py-4 space-y-1">
-              {navItems.map(({ key, label, icon: Icon }) => (
+              {visibleNav.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => { onNavigate(key); setMobileOpen(false); }}

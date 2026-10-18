@@ -1,7 +1,9 @@
 // Mock Supabase implementation for offline / local-demo operation
 // Stores all data in localStorage so that CRUD changes persist across reloads.
 
-const STORAGE_KEY_PREFIX = 'gh_pro_inr_';
+import { computeInvoice, calcNights } from './booking';
+
+const STORAGE_KEY_PREFIX = 'gh_pro_v2_'; // v2 schema: room categories, cleaning state, GST fields, ID types
 
 function getStorage<T>(key: string, defaultValue: T): T {
   try {
@@ -35,83 +37,56 @@ const DEFAULT_PROFILES = [
   { id: 'usr-manager-1', full_name: 'Vikramaditya Rao', role: 'duty_manager', phone: '+91 98201 11002', created_at: new Date().toISOString() },
 ];
 
+const NOW = new Date().toISOString();
 const DEFAULT_ROOMS = [
-  { id: 'rm-101', room_number: '101', room_type: 'single', floor: 1, status: 'occupied', price_per_night: 2500, notes: 'Ground floor, garden view', created_at: new Date().toISOString() },
-  { id: 'rm-102', room_number: '102', room_type: 'single', floor: 1, status: 'available', price_per_night: 2500, notes: null, created_at: new Date().toISOString() },
-  { id: 'rm-103', room_number: '103', room_type: 'single', floor: 1, status: 'available', price_per_night: 2800, notes: 'Corner room with study desk', created_at: new Date().toISOString() },
-  { id: 'rm-201', room_number: '201', room_type: 'double', floor: 2, status: 'reserved', price_per_night: 4500, notes: 'King size bed, balcony', created_at: new Date().toISOString() },
-  { id: 'rm-202', room_number: '202', room_type: 'double', floor: 2, status: 'available', price_per_night: 4500, notes: 'King size bed', created_at: new Date().toISOString() },
-  { id: 'rm-203', room_number: '203', room_type: 'double', floor: 2, status: 'available', price_per_night: 5000, notes: 'Deluxe double with patio', created_at: new Date().toISOString() },
-  { id: 'rm-301', room_number: '301', room_type: 'double', floor: 3, status: 'occupied', price_per_night: 6500, notes: 'Executive Suite, panoramic view', created_at: new Date().toISOString() },
-  { id: 'rm-302', room_number: '302', room_type: 'double', floor: 3, status: 'maintenance', price_per_night: 6500, notes: 'AC repair in progress by duty manager', created_at: new Date().toISOString() },
+  { id: 'rm-101', room_number: '101', room_type: 'standard', floor: 1, status: 'occupied', price_per_night: 2499, notes: 'Ground floor, garden view', created_at: NOW },
+  { id: 'rm-102', room_number: '102', room_type: 'standard', floor: 1, status: 'available', price_per_night: 2499, notes: null, created_at: NOW },
+  { id: 'rm-103', room_number: '103', room_type: 'standard', floor: 1, status: 'available', price_per_night: 2799, notes: 'Corner room with study desk', created_at: NOW },
+  { id: 'rm-201', room_number: '201', room_type: 'deluxe', floor: 2, status: 'reserved', price_per_night: 3999, notes: 'King size bed, balcony', created_at: NOW },
+  { id: 'rm-202', room_number: '202', room_type: 'deluxe', floor: 2, status: 'available', price_per_night: 3999, notes: 'King size bed', created_at: NOW },
+  { id: 'rm-203', room_number: '203', room_type: 'deluxe', floor: 2, status: 'cleaning', price_per_night: 4499, notes: 'Deluxe with patio', created_at: NOW },
+  { id: 'rm-301', room_number: '301', room_type: 'executive', floor: 3, status: 'occupied', price_per_night: 5499, notes: 'Executive suite, separate living room', created_at: NOW },
+  { id: 'rm-302', room_number: '302', room_type: 'executive', floor: 3, status: 'maintenance', price_per_night: 5499, notes: 'AC repair in progress by duty manager', created_at: NOW },
+  { id: 'rm-401', room_number: '401', room_type: 'presidential', floor: 4, status: 'available', price_per_night: 8999, notes: 'Panoramic terrace, jacuzzi, 24/7 room service', created_at: NOW },
 ];
 
 const DEFAULT_GUESTS = [
-  { id: 'gst-1', first_name: 'Aarav', last_name: 'Sharma', email: 'aarav.sharma@tcs.com', phone: '+91 98201 23456', address: 'Flat 402, Powai, Mumbai', id_number: 'IND-A482910', company: 'Tata Consultancy Services', created_at: new Date().toISOString() },
-  { id: 'gst-2', first_name: 'Priya', last_name: 'Patel', email: 'priya.patel@infosys.com', phone: '+91 97123 45678', address: '12th Cross, Indiranagar, Bengaluru', id_number: 'IND-B992341', company: 'Infosys Ltd', created_at: new Date().toISOString() },
-  { id: 'gst-3', first_name: 'Rohan', last_name: 'Verma', email: 'rohan.verma@wipro.com', phone: '+91 99887 65432', address: 'Sector 45, Gurugram', id_number: 'IND-C771290', company: 'Wipro Technologies', created_at: new Date().toISOString() },
-  { id: 'gst-4', first_name: 'Ananya', last_name: 'Iyer', email: 'ananya.iyer@hcl.com', phone: '+91 98450 11223', address: 'Anna Salai, T. Nagar, Chennai', id_number: 'IND-D123984', company: 'HCL Technologies', created_at: new Date().toISOString() },
-  { id: 'gst-5', first_name: 'Vikram', last_name: 'Singh', email: 'vikram.singh@reliance.com', phone: '+91 98112 34567', address: 'BKC, Bandra, Mumbai', id_number: 'IND-E556789', company: 'Reliance Industries', created_at: new Date().toISOString() },
+  { id: 'gst-1', first_name: 'Aarav', last_name: 'Sharma', email: 'aarav.sharma@tcs.com', phone: '+91 98201 23456', address: 'Flat 402, Powai, Mumbai', id_type: 'aadhaar', id_number: '298347562011', company: 'Tata Consultancy Services', created_at: NOW },
+  { id: 'gst-2', first_name: 'Priya', last_name: 'Patel', email: 'priya.patel@infosys.com', phone: '+91 97123 45678', address: '12th Cross, Indiranagar, Bengaluru', id_type: 'passport', id_number: 'K4829105', company: 'Infosys Ltd', created_at: NOW },
+  { id: 'gst-3', first_name: 'Rohan', last_name: 'Verma', email: 'rohan.verma@wipro.com', phone: '+91 99887 65432', address: 'Sector 45, Gurugram', id_type: 'aadhaar', id_number: '482150376946', company: 'Wipro Technologies', created_at: NOW },
+  { id: 'gst-4', first_name: 'Ananya', last_name: 'Iyer', email: 'ananya.iyer@hcl.com', phone: '+91 98450 11223', address: 'Anna Salai, T. Nagar, Chennai', id_type: 'driving_license', id_number: 'TN0920190012345', company: 'HCL Technologies', created_at: NOW },
+  { id: 'gst-5', first_name: 'Vikram', last_name: 'Singh', email: 'vikram.singh@reliance.com', phone: '+91 98112 34567', address: 'BKC, Bandra, Mumbai', id_type: 'voter_id', id_number: 'MHB1234567', company: 'Reliance Industries', created_at: NOW },
 ];
 
+function isoOffset(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function seedBooking(o: { id: string; guest_id: string; room_id: string; inDays: number; outDays: number; status: string; ref: string; by: string; pay: string; notes: string }) {
+  const room = DEFAULT_ROOMS.find((r) => r.id === o.room_id)!;
+  const check_in_date = isoOffset(o.inDays);
+  const check_out_date = isoOffset(o.outDays);
+  const inv = computeInvoice(room.price_per_night, calcNights(check_in_date, check_out_date));
+  return {
+    id: o.id, guest_id: o.guest_id, room_id: o.room_id, check_in_date, check_out_date,
+    status: o.status, booking_reference: o.ref, assigned_by: o.by,
+    subtotal: inv.subtotal, gst_rate: inv.rate, gst_amount: inv.gst, total_amount: inv.total,
+    payment_status: o.pay, notes: o.notes, created_at: NOW,
+  };
+}
+
 function getInitialBookings() {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  const todayStr = `${yyyy}-${mm}-${dd}`;
-
-  const pastDate = new Date(today);
-  pastDate.setDate(today.getDate() - 3);
-  const pastStr = pastDate.toISOString().split('T')[0];
-
-  const futureDate = new Date(today);
-  futureDate.setDate(today.getDate() + 4);
-  const futureStr = futureDate.toISOString().split('T')[0];
-
   return [
-    {
-      id: 'bk-1',
-      guest_id: 'gst-1',
-      room_id: 'rm-301',
-      check_in_date: pastStr,
-      check_out_date: futureStr,
-      status: 'checked_in',
-      booking_reference: 'GH-IN-1001',
-      assigned_by: 'Sunita Mehra',
-      total_amount: 45500,
-      payment_status: 'paid',
-      notes: 'VIP Executive stay - TCS corporate tariff',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'bk-2',
-      guest_id: 'gst-2',
-      room_id: 'rm-201',
-      check_in_date: todayStr,
-      check_out_date: futureStr,
-      status: 'confirmed',
-      booking_reference: 'GH-IN-1002',
-      assigned_by: 'Sunita Mehra',
-      total_amount: 18000,
-      payment_status: 'pending',
-      notes: 'Requested late check-in at 8 PM',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'bk-3',
-      guest_id: 'gst-3',
-      room_id: 'rm-101',
-      check_in_date: pastStr,
-      check_out_date: todayStr,
-      status: 'checked_in',
-      booking_reference: 'GH-IN-1003',
-      assigned_by: 'Vikramaditya Rao',
-      total_amount: 7500,
-      payment_status: 'paid',
-      notes: 'Single room allocation, breakfast included',
-      created_at: new Date().toISOString(),
-    },
+    seedBooking({ id: 'bk-1', guest_id: 'gst-1', room_id: 'rm-301', inDays: -3, outDays: 4, status: 'checked_in', ref: 'GH-IN-1001', by: 'Sunita Mehra', pay: 'paid', notes: 'Executive stay - TCS corporate tariff' }),
+    seedBooking({ id: 'bk-2', guest_id: 'gst-2', room_id: 'rm-201', inDays: 0, outDays: 4, status: 'confirmed', ref: 'GH-IN-1002', by: 'Sunita Mehra', pay: 'pending', notes: 'Requested late check-in at 8 PM' }),
+    seedBooking({ id: 'bk-3', guest_id: 'gst-3', room_id: 'rm-101', inDays: -3, outDays: 0, status: 'checked_in', ref: 'GH-IN-1003', by: 'Vikramaditya Rao', pay: 'paid', notes: 'Standard room, breakfast included' }),
+    seedBooking({ id: 'bk-4', guest_id: 'gst-4', room_id: 'rm-203', inDays: -5, outDays: -1, status: 'checked_out', ref: 'GH-IN-1004', by: 'Sunita Mehra', pay: 'paid', notes: 'Checked out yesterday; room awaiting housekeeping' }),
+    seedBooking({ id: 'bk-5', guest_id: 'gst-5', room_id: 'rm-401', inDays: 10, outDays: 12, status: 'confirmed', ref: 'GH-IN-1005', by: 'Rajesh Sharma', pay: 'pending', notes: 'Presidential suite for visiting dignitary' }),
   ];
 }
 
@@ -119,7 +94,7 @@ const DEFAULT_NOTIFICATIONS = [
   { id: 'notif-1', type: 'check_in_alert', title: 'Guest Arrival', message: 'Aarav Sharma has checked into Room 301.', recipient: 'staff', booking_id: 'bk-1', is_read: false, created_at: new Date().toISOString() },
   { id: 'notif-2', type: 'maintenance', title: 'Maintenance Logged', message: 'Room 302 placed out of order for AC repair by Vikramaditya Rao.', recipient: 'duty_manager', booking_id: null, is_read: false, created_at: new Date().toISOString() },
   { id: 'notif-3', type: 'booking_confirmation', title: 'New Reservation', message: 'Booking confirmed for Priya Patel (Room 201).', recipient: 'admin', booking_id: 'bk-2', is_read: true, created_at: new Date().toISOString() },
-  { id: 'notif-4', type: 'payment_reminder', title: 'Pending Payment Alert', message: 'Payment of ₹18,000 pending for Priya Patel (Room 201).', recipient: 'staff', booking_id: 'bk-2', is_read: false, created_at: new Date().toISOString() },
+  { id: 'notif-4', type: 'payment_reminder', title: 'Pending Payment Alert', message: 'Payment of ₹16,795.80 pending for Priya Patel (Room 201).', recipient: 'staff', booking_id: 'bk-2', is_read: false, created_at: new Date().toISOString() },
   { id: 'notif-5', type: 'check_in_alert', title: 'Guest Arrival', message: 'Rohan Verma has checked into Room 101.', recipient: 'staff', booking_id: 'bk-3', is_read: true, created_at: new Date().toISOString() },
 ];
 
@@ -256,9 +231,7 @@ export function createMockClient() {
     }
 
     select(columns = '*', options?: { count?: string; head?: boolean }) {
-      if (this.action !== 'insert') {
-        this.action = 'select';
-      }
+      // After insert()/update()/upsert(), .select() only asks for the affected rows back, so the action is kept.
       if (options?.head) this.isCountHead = true;
       return this;
     }
@@ -332,7 +305,7 @@ export function createMockClient() {
     }
 
     async execute(): Promise<{ data: any; error: null; count?: number }> {
-      let rows = getStorage<any[]>(this.table, []);
+      const rows = getStorage<any[]>(this.table, []);
 
       if (this.action === 'insert') {
         const arr = Array.isArray(this.actionPayload) ? this.actionPayload : [this.actionPayload];

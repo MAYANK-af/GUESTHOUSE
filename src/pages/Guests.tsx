@@ -1,10 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, type Guest, type Booking } from '@/lib/supabase';
-import { Plus, Pencil, Trash2, Search, Loader2, Users, Mail, Phone, MapPin, Building, Calendar, History, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Loader2, Users, Mail, Phone, MapPin, Building, Calendar, History } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
+import { useAuth } from '@/context/AuthContext';
+import { can } from '@/lib/permissions';
+import { ID_TYPES, maskId, normalizeId, validateId, type IdType } from '@/lib/identity';
+import { formatINR } from '@/lib/booking';
 
 export default function Guests() {
+  const { profile } = useAuth();
+  const canManage = can(profile?.role, 'guests.manage');
+  const canDelete = can(profile?.role, 'bookings.delete'); // deleting a guest cascades to their bookings -> admin only
+  const [idError, setIdError] = useState<string | null>(null);
+  const [idType, setIdType] = useState<IdType>('aadhaar');
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -33,19 +42,24 @@ export default function Guests() {
 
   function openAdd() {
     setEditingGuest(null);
-    setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setAddress(''); setIdNumber(''); setCompany('');
+    setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setAddress(''); setIdNumber(''); setCompany(''); setIdType('aadhaar'); setIdError(null);
     setModalOpen(true);
   }
 
   function openEdit(guest: Guest) {
     setEditingGuest(guest);
     setFirstName(guest.first_name); setLastName(guest.last_name); setEmail(guest.email ?? '');
-    setPhone(guest.phone ?? ''); setAddress(guest.address ?? ''); setIdNumber(guest.id_number ?? ''); setCompany(guest.company ?? '');
+    setPhone(guest.phone ?? ''); setAddress(guest.address ?? ''); setIdNumber(guest.id_number ?? ''); setCompany(guest.company ?? ''); setIdType((guest.id_type as IdType) ?? 'other'); setIdError(null);
     setModalOpen(true);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (idNumber.trim()) {
+      const err = validateId(idType, idNumber);
+      if (err) { setIdError(err); return; }
+    }
+    setIdError(null);
     setSaving(true);
     const payload = {
       first_name: firstName,
@@ -53,7 +67,8 @@ export default function Guests() {
       email: email || null,
       phone: phone || null,
       address: address || null,
-      id_number: idNumber || null,
+      id_type: idNumber.trim() ? idType : null,
+      id_number: idNumber.trim() ? normalizeId(idType, idNumber) : null,
       company: company || null,
     };
 
@@ -111,10 +126,12 @@ export default function Guests() {
           <h1 className="text-2xl font-bold text-slate-900">Guest Management</h1>
           <p className="text-sm text-slate-500 mt-1">Manage guest profiles and view stay history</p>
         </div>
-        <button onClick={openAdd} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Add Guest
-        </button>
+        {canManage && (
+          <button onClick={openAdd} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Add Guest
+          </button>
+        )}
       </div>
 
       <div className="card p-4">
@@ -143,14 +160,18 @@ export default function Guests() {
                   {guest.company && <p className="text-xs text-slate-500">{guest.company}</p>}
                 </div>
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openEdit(guest)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600">
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDelete(guest)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              {canManage && (
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                  <button onClick={() => openEdit(guest)} aria-label={`Edit ${guest.first_name}`} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  {canDelete && (
+                    <button onClick={() => handleDelete(guest)} aria-label={`Delete ${guest.first_name}`} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 text-sm">
@@ -175,7 +196,7 @@ export default function Guests() {
               {guest.id_number && (
                 <div className="flex items-center gap-2 text-slate-600">
                   <Building className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span>ID: {guest.id_number}</span>
+                  <span>{ID_TYPES.find(t => t.value === guest.id_type)?.label ?? 'ID'}: {maskId(guest.id_type, guest.id_number)}</span>
                 </div>
               )}
             </div>
@@ -226,8 +247,14 @@ export default function Guests() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="label-field">ID / Passport Number</label>
-              <input type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className="input-field" placeholder="IND-A482910" />
+              <label className="label-field">Identity Proof</label>
+              <div className="flex gap-2">
+                <select aria-label="ID type" value={idType} onChange={(e) => { setIdType(e.target.value as IdType); setIdError(null); }} className="input-field w-40">
+                  {ID_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+                <input type="text" aria-label="ID number" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className="input-field" placeholder={ID_TYPES.find(t => t.value === idType)?.hint} />
+              </div>
+              {idError && <p role="alert" className="text-xs text-red-600 mt-1">{idError}</p>}
             </div>
             <div>
               <label className="label-field">Company</label>
@@ -266,7 +293,7 @@ export default function Guests() {
                 </div>
                 <div className="text-right">
                   <StatusBadge status={booking.status} />
-                  {booking.total_amount && <p className="text-xs text-slate-500 mt-1">₹{booking.total_amount.toLocaleString('en-IN')}</p>}
+                  {booking.total_amount && <p className="text-xs text-slate-500 mt-1">{formatINR(booking.total_amount)}</p>}
                 </div>
               </div>
             ))}

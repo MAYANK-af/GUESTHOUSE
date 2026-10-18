@@ -1,12 +1,23 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { supabase, type Room, type RoomStatus, type RoomType } from '@/lib/supabase';
-import { Plus, Pencil, Trash2, Hotel, BedDouble, Wrench, Search, Loader2, IndianRupee, Building } from 'lucide-react';
+import { supabase, type Room, type RoomType } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { can } from '@/lib/permissions';
+import { ROOM_TRANSITIONS, type RoomStatus } from '@/lib/roomFsm';
+import { BookingError, setRoomStatus } from '@/lib/bookingService';
+import { formatINR } from '@/lib/booking';
+import { Plus, Pencil, Trash2, Hotel, BedDouble, Search, Loader2, IndianRupee, Building } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
 
-const statusOptions: RoomStatus[] = ['available', 'occupied', 'maintenance', 'reserved'];
+// 'occupied' and 'reserved' are driven by bookings (check-in / new booking); staff only change these manually.
+const MANUAL_TARGETS: RoomStatus[] = ['available', 'cleaning', 'maintenance'];
+const ROOM_TYPES: RoomType[] = ['standard', 'deluxe', 'executive', 'presidential'];
 
 export default function Rooms() {
+  const { profile } = useAuth();
+  const role = profile?.role;
+  const canManage = can(role, 'rooms.manage');
+  const [error, setError] = useState<string | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -18,9 +29,8 @@ export default function Rooms() {
 
   // form state
   const [roomNumber, setRoomNumber] = useState('');
-  const [roomType, setRoomType] = useState<RoomType>('single');
+  const [roomType, setRoomType] = useState<RoomType>('standard');
   const [floor, setFloor] = useState('');
-  const [status, setStatus] = useState<RoomStatus>('available');
   const [price, setPrice] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -35,7 +45,7 @@ export default function Rooms() {
 
   function openAdd() {
     setEditingRoom(null);
-    setRoomNumber(''); setRoomType('single'); setFloor(''); setStatus('available'); setPrice(''); setNotes('');
+    setRoomNumber(''); setRoomType('standard'); setFloor(''); setPrice(''); setNotes('');
     setModalOpen(true);
   }
 
@@ -44,7 +54,6 @@ export default function Rooms() {
     setRoomNumber(room.room_number);
     setRoomType(room.room_type);
     setFloor(room.floor?.toString() ?? '');
-    setStatus(room.status);
     setPrice(room.price_per_night.toString());
     setNotes(room.notes ?? '');
     setModalOpen(true);
@@ -57,7 +66,6 @@ export default function Rooms() {
       room_number: roomNumber,
       room_type: roomType,
       floor: floor ? parseInt(floor) : null,
-      status,
       price_per_night: parseFloat(price) || 0,
       notes: notes || null,
     };
@@ -65,7 +73,7 @@ export default function Rooms() {
     if (editingRoom) {
       await supabase.from('rooms').update(payload).eq('id', editingRoom.id);
     } else {
-      await supabase.from('rooms').insert(payload);
+      await supabase.from('rooms').insert({ ...payload, status: 'available' });
     }
 
     setSaving(false);
@@ -79,8 +87,22 @@ export default function Rooms() {
     loadRooms();
   }
 
+  /** Targets this user may pick for a room: FSM-legal AND within the role's permission. */
+  function allowedTargets(room: Room): RoomStatus[] {
+    return MANUAL_TARGETS.filter((t) => {
+      if (!ROOM_TRANSITIONS[room.status].includes(t)) return false;
+      if (can(role, 'rooms.maintenance')) return true;
+      return can(role, 'rooms.markClean') && room.status === 'cleaning' && t === 'available';
+    });
+  }
+
   async function handleStatusChange(room: Room, newStatus: RoomStatus) {
-    await supabase.from('rooms').update({ status: newStatus }).eq('id', room.id);
+    setError(null);
+    try {
+      await setRoomStatus(supabase, room.id, newStatus);
+    } catch (err) {
+      setError(err instanceof BookingError ? err.message : 'Could not change the room status.');
+    }
     loadRooms();
   }
 
@@ -109,11 +131,17 @@ export default function Rooms() {
           <h1 className="text-2xl font-bold text-slate-900">Room Management</h1>
           <p className="text-sm text-slate-500 mt-1">Manage rooms, types, and availability status</p>
         </div>
-        <button onClick={openAdd} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Add Room
-        </button>
+        {canManage && (
+          <button onClick={openAdd} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Add Room
+          </button>
+        )}
       </div>
+
+      {error && (
+        <div role="alert" className="rounded-xl bg-red-50 ring-1 ring-red-200 text-red-700 text-sm px-4 py-3">{error}</div>
+      )}
 
       {/* Filters */}
       <div className="card p-4 flex flex-col sm:flex-row gap-3">
@@ -131,13 +159,13 @@ export default function Rooms() {
           <option value="all">All Statuses</option>
           <option value="available">Available</option>
           <option value="occupied">Occupied</option>
-          <option value="maintenance">Maintenance</option>
           <option value="reserved">Reserved</option>
+          <option value="cleaning">Cleaning</option>
+          <option value="maintenance">Maintenance</option>
         </select>
         <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="input-field sm:w-40">
           <option value="all">All Types</option>
-          <option value="single">Single</option>
-          <option value="double">Double</option>
+          {ROOM_TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
         </select>
       </div>
 
@@ -148,23 +176,23 @@ export default function Rooms() {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  room.room_type === 'double' ? 'bg-violet-100' : 'bg-sky-100'
+                  room.room_type !== 'standard' ? 'bg-violet-100' : 'bg-sky-100'
                 }`}>
-                  {room.room_type === 'double' ? <BedDouble className="w-6 h-6 text-violet-600" /> : <Hotel className="w-6 h-6 text-sky-600" />}
+                  {room.room_type !== 'standard' ? <BedDouble className="w-6 h-6 text-violet-600" /> : <Hotel className="w-6 h-6 text-sky-600" />}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">Room {room.room_number}</h3>
-                  <p className="text-xs text-slate-500 capitalize">{room.room_type} room{room.floor ? ` • Floor ${room.floor}` : ''}</p>
+                  <p className="text-xs text-slate-500 capitalize">{room.room_type}{room.room_type === 'standard' || room.room_type === 'deluxe' ? ' room' : ' suite'}{room.floor ? ` • Floor ${room.floor}` : ''}</p>
                 </div>
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openEdit(room)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600">
+              {canManage && (<div className="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <button onClick={() => openEdit(room)} aria-label={`Edit room ${room.room_number}`} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600">
                   <Pencil className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(room)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600">
+                <button onClick={() => handleDelete(room)} aria-label={`Delete room ${room.room_number}`} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600">
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </div>
+              </div>)}
             </div>
 
             <div className="mb-3">
@@ -176,18 +204,22 @@ export default function Rooms() {
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1.5 text-slate-700">
                 <IndianRupee className="w-4 h-4 text-emerald-600" />
-                <span className="font-semibold">{room.price_per_night.toLocaleString('en-IN')}</span>
+                <span className="font-semibold">{formatINR(room.price_per_night).slice(1)}</span>
                 <span className="text-xs text-slate-400">/night</span>
               </div>
-              <select
-                value={room.status}
-                onChange={(e) => handleStatusChange(room, e.target.value as RoomStatus)}
-                className="text-xs font-medium rounded-lg border-0 bg-slate-50 px-2.5 py-1.5 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-sky-500 cursor-pointer"
-              >
-                {statusOptions.map(s => (
-                  <option key={s} value={s}>{s.replace('_', ' ')}</option>
-                ))}
-              </select>
+              {allowedTargets(room).length > 0 && (
+                <select
+                  aria-label={`Change status of room ${room.room_number}`}
+                  value={room.status}
+                  onChange={(e) => handleStatusChange(room, e.target.value as RoomStatus)}
+                  className="text-xs font-medium rounded-lg border-0 bg-slate-50 px-2.5 py-1.5 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                >
+                  <option value={room.status}>{room.status}</option>
+                  {allowedTargets(room).map(t => (
+                    <option key={t} value={t}>→ {t === 'available' && room.status === 'cleaning' ? 'mark clean (available)' : t}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         ))}
@@ -216,20 +248,13 @@ export default function Rooms() {
             <div>
               <label className="label-field">Room Type</label>
               <select value={roomType} onChange={(e) => setRoomType(e.target.value as RoomType)} className="input-field">
-                <option value="single">Single</option>
-                <option value="double">Double</option>
+                {ROOM_TYPES.map(t => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
               </select>
             </div>
             <div>
-              <label className="label-field">Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value as RoomStatus)} className="input-field">
-                {statusOptions.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-              </select>
+              <label className="label-field">Price per Night (₹)</label>
+              <input type="number" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="input-field" placeholder="2499" />
             </div>
-          </div>
-          <div>
-            <label className="label-field">Price per Night (₹)</label>
-            <input type="number" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="input-field" placeholder="2500" />
           </div>
           <div>
             <label className="label-field">Notes</label>

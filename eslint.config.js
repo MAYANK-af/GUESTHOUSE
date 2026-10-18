@@ -24,5 +24,10 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
     },
+  },
+  {
+    // The offline engine, the DB-client service layer and the tests intentionally deal with loosely typed rows.
+    files: ['src/lib/mockSupabase.ts', 'src/lib/bookingService.ts', 'src/lib/supabase.ts', 'tests/**/*.{ts,tsx}'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off', '@typescript-eslint/no-unused-vars': 'off' },
   }
 );

@@ -1,12 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, type Booking, type Guest, type Room, type BookingStatus, type PaymentStatus } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { Plus, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, X, Loader2, IndianRupee, User, BedDouble, Trash2, Pencil } from 'lucide-react';
+import { Plus, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, X, Loader2, Trash2, Pencil, Receipt, AlertTriangle } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
+import { can } from '@/lib/permissions';
+import { calcNights, computeInvoice, findConflict, formatINR } from '@/lib/booking';
+import { BOOKING_TRANSITIONS, type BookingStatusFsm } from '@/lib/roomFsm';
+import { BookingError, changeBookingStatus, createBooking, updateBooking } from '@/lib/bookingService';
 
 export default function Bookings() {
   const { profile } = useAuth();
+  const role = profile?.role;
+  const canCreate = can(role, 'bookings.create');
+  const canEdit = can(role, 'bookings.edit');
+  const canCheckin = can(role, 'bookings.checkin');
+  const canCancel = can(role, 'bookings.cancel');
+  const canDelete = can(role, 'bookings.delete');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -16,6 +26,9 @@ export default function Bookings() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null);
 
   // form
   const [guestId, setGuestId] = useState('');
@@ -25,7 +38,6 @@ export default function Bookings() {
   const [status, setStatus] = useState<BookingStatus>('confirmed');
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
   const [assignedBy, setAssignedBy] = useState('');
-  const [totalAmount, setTotalAmount] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => { loadData(); }, []);
@@ -47,7 +59,7 @@ export default function Bookings() {
     setEditingBooking(null);
     setGuestId(''); setRoomId(''); setCheckIn(''); setCheckOut('');
     setStatus('confirmed'); setPaymentStatus('pending');
-    setAssignedBy(profile?.full_name ?? ''); setTotalAmount(''); setNotes('');
+    setAssignedBy(profile?.full_name ?? ''); setNotes(''); setFormError(null);
     setModalOpen(true);
   }
 
@@ -60,7 +72,7 @@ export default function Bookings() {
     setStatus(booking.status);
     setPaymentStatus(booking.payment_status);
     setAssignedBy(booking.assigned_by ?? '');
-    setTotalAmount(booking.total_amount?.toString() ?? '');
+    setFormError(null);
     setNotes(booking.notes ?? '');
     setModalOpen(true);
   }
@@ -68,79 +80,38 @@ export default function Bookings() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-
-    const room = rooms.find(r => r.id === roomId);
-    const nights = Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24));
-    const calculated = room ? (room.price_per_night * nights).toFixed(2) : totalAmount;
-
-    const payload = {
-      guest_id: guestId,
-      room_id: roomId,
-      check_in_date: checkIn,
-      check_out_date: checkOut,
-      status,
-      payment_status: paymentStatus,
-      assigned_by: assignedBy || null,
-      total_amount: parseFloat(totalAmount || calculated) || null,
-      notes: notes || null,
-    };
-
-    if (editingBooking) {
-      await supabase.from('bookings').update(payload).eq('id', editingBooking.id);
-    } else {
-      const { data } = await supabase.from('bookings').insert(payload).select('*').single();
-      if (data) {
-        await supabase.from('notifications').insert({
-          type: 'booking_confirmation',
-          title: 'New Booking Created',
-          message: `Booking ${data.booking_reference} for Room ${room?.room_number}`,
-          recipient: 'all',
-          booking_id: data.id,
+    setFormError(null);
+    try {
+      if (editingBooking) {
+        await updateBooking(supabase, editingBooking.id, {
+          guestId, roomId, checkIn, checkOut, paymentStatus,
+          assignedBy: assignedBy || null, notes: notes || null,
+        });
+        if (status !== editingBooking.status) {
+          await changeBookingStatus(supabase, editingBooking.id, status as BookingStatusFsm);
+        }
+      } else {
+        await createBooking(supabase, {
+          guestId, roomId, checkIn, checkOut, paymentStatus,
+          assignedBy: assignedBy || null, notes: notes || null,
         });
       }
+      setModalOpen(false);
+      loadData();
+    } catch (err) {
+      setFormError(err instanceof BookingError ? err.message : 'Could not save the booking. Please try again.');
+    } finally {
+      setSaving(false);
     }
-
-    if (status === 'checked_in' && room) {
-      await supabase.from('rooms').update({ status: 'occupied' }).eq('id', roomId);
-    } else if (status === 'checked_out' && room) {
-      await supabase.from('rooms').update({ status: 'available' }).eq('id', roomId);
-    } else if (status === 'confirmed' && room && room.status === 'available') {
-      await supabase.from('rooms').update({ status: 'reserved' }).eq('id', roomId);
-    }
-
-    setSaving(false);
-    setModalOpen(false);
-    loadData();
   }
 
   async function handleStatusUpdate(booking: Booking, newStatus: BookingStatus) {
-    await supabase.from('bookings').update({ status: newStatus }).eq('id', booking.id);
-
-    if (newStatus === 'checked_in') {
-      await supabase.from('rooms').update({ status: 'occupied' }).eq('id', booking.room_id);
-      await supabase.from('notifications').insert({
-        type: 'check_in_alert',
-        title: 'Guest Checked In',
-        message: `${booking.guest?.first_name} ${booking.guest?.last_name} checked in to Room ${booking.room?.room_number}`,
-        recipient: 'all',
-        booking_id: booking.id,
-      });
-    } else if (newStatus === 'checked_out') {
-      await supabase.from('rooms').update({ status: 'available' }).eq('id', booking.room_id);
-      await supabase.from('notifications').insert({
-        type: 'check_out_alert',
-        title: 'Guest Checked Out',
-        message: `${booking.guest?.first_name} ${booking.guest?.last_name} checked out of Room ${booking.room?.room_number}`,
-        recipient: 'all',
-        booking_id: booking.id,
-      });
-    } else if (newStatus === 'cancelled') {
-      const room = rooms.find(r => r.id === booking.room_id);
-      if (room && room.status === 'reserved') {
-        await supabase.from('rooms').update({ status: 'available' }).eq('id', booking.room_id);
-      }
+    setPageError(null);
+    try {
+      await changeBookingStatus(supabase, booking.id, newStatus as BookingStatusFsm);
+    } catch (err) {
+      setPageError(err instanceof BookingError ? err.message : 'Could not update the booking.');
     }
-
     loadData();
   }
 
@@ -163,6 +134,14 @@ export default function Bookings() {
       return b.check_in_date <= dateStr && b.check_out_date >= dateStr && b.status !== 'cancelled';
     });
   }
+
+  const selectedRoom = rooms.find(r => r.id === roomId);
+  const nights = calcNights(checkIn, checkOut);
+  const preview = selectedRoom && nights > 0 ? computeInvoice(selectedRoom.price_per_night, nights) : null;
+  const liveConflict = roomId && nights > 0 ? findConflict(bookings, roomId, checkIn, checkOut, editingBooking?.id) : undefined;
+  const statusChoices: BookingStatus[] = editingBooking
+    ? [editingBooking.status, ...BOOKING_TRANSITIONS[editingBooking.status as BookingStatusFsm]]
+    : ['confirmed'];
 
   if (loading) {
     return (
@@ -196,12 +175,21 @@ export default function Bookings() {
               List
             </button>
           </div>
-          <button onClick={openAdd} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            New Booking
-          </button>
+          {canCreate && (
+            <button onClick={openAdd} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              New Booking
+            </button>
+          )}
         </div>
       </div>
+
+      {pageError && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 ring-1 ring-red-200 text-red-700 text-sm px-4 py-3">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>{pageError}</span>
+        </div>
+      )}
 
       {view === 'calendar' ? (
         <div className="card p-4 sm:p-6">
@@ -240,7 +228,7 @@ export default function Bookings() {
                     {dayBookings.slice(0, 2).map(b => (
                       <div
                         key={b.id}
-                        onClick={() => openEdit(b)}
+                        onClick={() => (canEdit ? openEdit(b) : setInvoiceBooking(b))}
                         className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded truncate cursor-pointer border-l-2 hover:opacity-80 transition-opacity ${statusColors[b.status] ?? 'bg-slate-100'}`}
                       >
                         {b.room?.room_number} — {b.guest?.first_name}
@@ -278,6 +266,7 @@ export default function Bookings() {
                   <th className="text-left text-xs font-semibold text-slate-500 uppercase px-4 py-3">Check Out</th>
                   <th className="text-left text-xs font-semibold text-slate-500 uppercase px-4 py-3">Status</th>
                   <th className="text-left text-xs font-semibold text-slate-500 uppercase px-4 py-3">Payment</th>
+                  <th className="text-right text-xs font-semibold text-slate-500 uppercase px-4 py-3">Total (incl. GST)</th>
                   <th className="text-right text-xs font-semibold text-slate-500 uppercase px-4 py-3">Actions</th>
                 </tr>
               </thead>
@@ -291,24 +280,37 @@ export default function Bookings() {
                     <td className="px-4 py-3 text-sm text-slate-600">{new Date(booking.check_out_date).toLocaleDateString()}</td>
                     <td className="px-4 py-3"><StatusBadge status={booking.status} /></td>
                     <td className="px-4 py-3"><StatusBadge status={booking.payment_status} /></td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900 text-right">{formatINR(booking.total_amount)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {booking.status === 'confirmed' && (
-                          <button onClick={() => handleStatusUpdate(booking, 'checked_in')} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50" title="Check In">
+                        {booking.status === 'confirmed' && canCheckin && (
+                          <button onClick={() => handleStatusUpdate(booking, 'checked_in')} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50" title="Check In" aria-label="Check In">
                             <LogIn className="w-4 h-4" />
                           </button>
                         )}
-                        {booking.status === 'checked_in' && (
-                          <button onClick={() => handleStatusUpdate(booking, 'checked_out')} className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50" title="Check Out">
+                        {booking.status === 'checked_in' && canCheckin && (
+                          <button onClick={() => handleStatusUpdate(booking, 'checked_out')} className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50" title="Check Out" aria-label="Check Out">
                             <LogOut className="w-4 h-4" />
                           </button>
                         )}
-                        <button onClick={() => openEdit(booking)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600" title="Edit">
-                          <Pencil className="w-4 h-4" />
+                        {booking.status === 'confirmed' && canCancel && (
+                          <button onClick={() => handleStatusUpdate(booking, 'cancelled')} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600" title="Cancel booking" aria-label="Cancel booking">
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button onClick={() => setInvoiceBooking(booking)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600" title="Invoice" aria-label="Invoice">
+                          <Receipt className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(booking)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600" title="Delete">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => openEdit(booking)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-sky-600" title="Edit" aria-label="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => handleDelete(booking)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600" title="Delete" aria-label="Delete">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -340,7 +342,7 @@ export default function Bookings() {
               <label className="label-field">Room</label>
               <select required value={roomId} onChange={(e) => setRoomId(e.target.value)} className="input-field">
                 <option value="">Select room...</option>
-                {rooms.map(r => <option key={r.id} value={r.id}>Room {r.room_number} ({r.room_type}) — ₹{r.price_per_night.toLocaleString('en-IN')}/night</option>)}
+                {rooms.map(r => <option key={r.id} value={r.id} disabled={r.status === 'maintenance'}>Room {r.room_number} ({r.room_type}) — {formatINR(r.price_per_night)}/night{r.status === 'maintenance' ? ' · under maintenance' : ''}</option>)}
               </select>
             </div>
           </div>
@@ -359,11 +361,8 @@ export default function Bookings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">Booking Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value as BookingStatus)} className="input-field">
-                <option value="confirmed">Confirmed</option>
-                <option value="checked_in">Checked In</option>
-                <option value="checked_out">Checked Out</option>
-                <option value="cancelled">Cancelled</option>
+              <select value={status} onChange={(e) => setStatus(e.target.value as BookingStatus)} disabled={!editingBooking || statusChoices.length < 2} className="input-field">
+                {statusChoices.map(st => <option key={st} value={st}>{st.replace('_', ' ')}</option>)}
               </select>
             </div>
             <div>
@@ -381,11 +380,30 @@ export default function Bookings() {
               <label className="label-field">Assigned By (Employee)</label>
               <input type="text" value={assignedBy} onChange={(e) => setAssignedBy(e.target.value)} className="input-field" placeholder="Employee name" />
             </div>
-            <div>
-              <label className="label-field">Total Amount (₹)</label>
-              <input type="number" step="0.01" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} className="input-field" placeholder="Auto-calculated if empty" />
-            </div>
+            <div />
           </div>
+
+          {liveConflict && (
+            <div role="alert" className="flex items-start gap-2 rounded-lg bg-amber-50 ring-1 ring-amber-200 text-amber-800 text-sm px-3 py-2">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>Room already booked {liveConflict.check_in_date} to {liveConflict.check_out_date} ({liveConflict.booking_reference}).</span>
+            </div>
+          )}
+
+          {preview && (
+            <div data-testid="price-preview" className="rounded-xl bg-slate-50 ring-1 ring-slate-200 p-3 text-sm space-y-1">
+              <div className="flex justify-between"><span className="text-slate-500">{preview.nights} night{preview.nights > 1 ? 's' : ''} × {formatINR(selectedRoom!.price_per_night)}</span><span>{formatINR(preview.subtotal, true)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">GST @ {Math.round(preview.rate * 100)}%</span><span>{formatINR(preview.gst, true)}</span></div>
+              <div className="flex justify-between font-semibold text-slate-900 border-t border-slate-200 pt-1"><span>Total</span><span>{formatINR(preview.total, true)}</span></div>
+            </div>
+          )}
+
+          {formError && (
+            <div role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-red-700 text-sm px-3 py-2">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
 
           <div>
             <label className="label-field">Notes</label>
@@ -400,6 +418,28 @@ export default function Bookings() {
             </button>
           </div>
         </form>
+      </Modal>
+      <Modal open={!!invoiceBooking} onClose={() => setInvoiceBooking(null)} title="Tax Invoice" maxWidth="max-w-lg">
+        {invoiceBooking && (() => {
+          const n = calcNights(invoiceBooking.check_in_date, invoiceBooking.check_out_date);
+          const inv = invoiceBooking.subtotal != null
+            ? { subtotal: invoiceBooking.subtotal, rate: invoiceBooking.gst_rate ?? 0, gst: invoiceBooking.gst_amount ?? 0, total: invoiceBooking.total_amount ?? 0 }
+            : { subtotal: invoiceBooking.total_amount ?? 0, rate: 0, gst: 0, total: invoiceBooking.total_amount ?? 0 };
+          return (
+            <div data-testid="invoice" className="space-y-3 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Reference</span><span className="font-mono font-medium">{invoiceBooking.booking_reference}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Guest</span><span>{invoiceBooking.guest?.first_name} {invoiceBooking.guest?.last_name}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Room</span><span>{invoiceBooking.room?.room_number} ({invoiceBooking.room?.room_type})</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Stay</span><span>{invoiceBooking.check_in_date} → {invoiceBooking.check_out_date} ({n} night{n > 1 ? 's' : ''})</span></div>
+              <div className="border-t border-slate-200 pt-3 space-y-1">
+                <div className="flex justify-between"><span>Room charges</span><span>{formatINR(inv.subtotal, true)}</span></div>
+                <div className="flex justify-between"><span>GST @ {Math.round(inv.rate * 100)}%</span><span>{formatINR(inv.gst, true)}</span></div>
+                <div className="flex justify-between font-bold text-slate-900 text-base border-t border-slate-200 pt-2"><span>Total payable</span><span>{formatINR(inv.total, true)}</span></div>
+              </div>
+              <div className="flex justify-between items-center"><span className="text-slate-500">Payment</span><StatusBadge status={invoiceBooking.payment_status} /></div>
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

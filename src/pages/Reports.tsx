@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { supabase, type Booking, type Guest, type Room } from '@/lib/supabase';
 import { BarChart3, Download, Filter, Calendar, TrendingUp, IndianRupee, BedDouble, Users } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
+import { calcNights, formatINR } from '@/lib/booking';
 
 export default function Reports() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [guests, setGuests] = useState<Guest[]>([]);
+  const [, setGuests] = useState<Guest[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,28 +40,24 @@ export default function Reports() {
     return monthMatch && employeeMatch && roomMatch;
   });
 
-  const totalRevenue = filtered.reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
-  const paidRevenue = filtered.filter(b => b.payment_status === 'paid').reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
-  const pendingRevenue = filtered.filter(b => b.payment_status === 'pending').reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
-  const totalNights = filtered.reduce((sum, b) => {
-    const nights = Math.ceil((new Date(b.check_out_date).getTime() - new Date(b.check_in_date).getTime()) / (1000 * 60 * 60 * 24));
-    return sum + nights;
-  }, 0);
+  const billable = filtered.filter(b => b.status !== 'cancelled'); // cancelled stays earn nothing
+  const totalRevenue = billable.reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
+  const gstCollected = billable.reduce((sum, b) => sum + (b.gst_amount ?? 0), 0);
+  const paidRevenue = billable.filter(b => b.payment_status === 'paid').reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
+  const pendingRevenue = billable.filter(b => b.payment_status === 'pending').reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
+  const totalNights = billable.reduce((sum, b) => sum + calcNights(b.check_in_date, b.check_out_date), 0);
 
   // Room allocation breakdown
   const roomAllocation = rooms.map(room => {
-    const roomBookings = filtered.filter(b => b.room_id === room.id);
-    const nights = roomBookings.reduce((sum, b) => {
-      const n = Math.ceil((new Date(b.check_out_date).getTime() - new Date(b.check_in_date).getTime()) / (1000 * 60 * 60 * 24));
-      return sum + n;
-    }, 0);
+    const roomBookings = billable.filter(b => b.room_id === room.id);
+    const nights = roomBookings.reduce((sum, b) => sum + calcNights(b.check_in_date, b.check_out_date), 0);
     const revenue = roomBookings.reduce((sum, b) => sum + (b.total_amount ?? 0), 0);
     return { room, bookingCount: roomBookings.length, nights, revenue };
   }).sort((a, b) => b.revenue - a.revenue);
 
   // Employee allocation
   const employeeAllocation = employees.map(emp => {
-    const empBookings = filtered.filter(b => b.assigned_by === emp);
+    const empBookings = billable.filter(b => b.assigned_by === emp);
     return {
       name: emp,
       bookings: empBookings.length,
@@ -68,20 +65,31 @@ export default function Reports() {
     };
   }).sort((a, b) => b.bookings - a.bookings);
 
+  // Quote every cell, double embedded quotes, and defuse spreadsheet formula injection (=, +, -, @).
+  const csvCell = (c: unknown) => {
+    let v = String(c ?? '');
+    if (/^[=+\-@]/.test(v)) v = "'" + v;
+    return `"${v.replace(/"/g, '""')}"`;
+  };
+
   function exportCSV() {
-    const headers = ['Reference', 'Guest', 'Room', 'Check In', 'Check Out', 'Status', 'Payment', 'Assigned By', 'Amount'];
+    const headers = ['Reference', 'Guest', 'Room', 'Check In', 'Check Out', 'Nights', 'Status', 'Payment', 'Assigned By', 'Subtotal (INR)', 'GST Rate', 'GST (INR)', 'Total (INR)'];
     const rows = filtered.map(b => [
       b.booking_reference,
-      `${b.guest?.first_name} ${b.guest?.last_name}`,
+      `${b.guest?.first_name ?? ''} ${b.guest?.last_name ?? ''}`.trim(),
       b.room?.room_number ?? '',
       b.check_in_date,
       b.check_out_date,
+      calcNights(b.check_in_date, b.check_out_date),
       b.status,
       b.payment_status,
       b.assigned_by ?? '',
-      b.total_amount ?? 0,
+      (b.subtotal ?? b.total_amount ?? 0).toFixed(2),
+      b.gst_rate != null ? `${Math.round(b.gst_rate * 100)}%` : '',
+      (b.gst_amount ?? 0).toFixed(2),
+      (b.total_amount ?? 0).toFixed(2),
     ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -150,11 +158,12 @@ export default function Reports() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: 'Total Bookings', value: filtered.length, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
-          { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString('en-IN')}`, icon: IndianRupee, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Collected', value: `₹${paidRevenue.toLocaleString('en-IN')}`, icon: TrendingUp, color: 'text-violet-600 bg-violet-50' },
+          { label: 'Total Revenue (incl. GST)', value: formatINR(totalRevenue), icon: IndianRupee, color: 'text-emerald-600 bg-emerald-50' },
+          { label: 'Collected', value: formatINR(paidRevenue), icon: TrendingUp, color: 'text-violet-600 bg-violet-50' },
+          { label: 'GST Billed', value: formatINR(gstCollected), icon: IndianRupee, color: 'text-rose-600 bg-rose-50' },
           { label: 'Total Nights', value: totalNights, icon: BedDouble, color: 'text-amber-600 bg-amber-50' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card p-5">
@@ -178,7 +187,7 @@ export default function Reports() {
           </div>
           <div>
             <p className="text-sm font-semibold text-amber-900">Pending Payments</p>
-            <p className="text-xs text-amber-700">₹{pendingRevenue.toLocaleString('en-IN')} awaiting collection</p>
+            <p className="text-xs text-amber-700">{formatINR(pendingRevenue)} awaiting collection</p>
           </div>
         </div>
       )}
@@ -206,7 +215,7 @@ export default function Reports() {
                   <td className="px-4 py-3 text-sm text-slate-600 capitalize">{room.room_type}</td>
                   <td className="px-4 py-3 text-sm text-slate-700 text-center">{bookingCount}</td>
                   <td className="px-4 py-3 text-sm text-slate-700 text-center">{nights}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">₹{revenue.toLocaleString('en-IN')}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">{formatINR(revenue)}</td>
                 </tr>
               ))}
             </tbody>
@@ -247,7 +256,7 @@ export default function Reports() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700 text-center">{emp.bookings}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">₹{emp.revenue.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-emerald-700 text-right">{formatINR(emp.revenue)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -271,7 +280,8 @@ export default function Reports() {
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase px-4 py-3">Dates</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase px-4 py-3">Assigned By</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase px-4 py-3">Status</th>
-                <th className="text-right text-xs font-semibold text-slate-500 uppercase px-4 py-3">Amount</th>
+                <th className="text-right text-xs font-semibold text-slate-500 uppercase px-4 py-3">GST</th>
+                <th className="text-right text-xs font-semibold text-slate-500 uppercase px-4 py-3">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -285,7 +295,8 @@ export default function Reports() {
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600">{booking.assigned_by ?? '—'}</td>
                   <td className="px-4 py-3"><StatusBadge status={booking.status} /></td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-900 text-right">₹{(booking.total_amount ?? 0).toLocaleString('en-IN')}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600 text-right">{booking.gst_rate != null ? `${formatINR(booking.gst_amount, true)} (${Math.round(booking.gst_rate * 100)}%)` : '—'}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-900 text-right">{formatINR(booking.total_amount, true)}</td>
                 </tr>
               ))}
             </tbody>

@@ -19,7 +19,13 @@ export const supabase: any = isRealSupabase
     })
   : createMockClient();
 
-export type UserRole = 'admin' | 'staff' | 'duty_manager';
+export const isMockMode = !isRealSupabase;
+
+export type { UserRole } from './permissions';
+import type { UserRole } from './permissions';
+import type { IdType } from './identity';
+import type { RoomStatus } from './roomFsm';
+export type { IdType, RoomStatus };
 
 export interface Profile {
   id: string;
@@ -29,8 +35,7 @@ export interface Profile {
   created_at: string;
 }
 
-export type RoomType = 'single' | 'double';
-export type RoomStatus = 'available' | 'occupied' | 'maintenance' | 'reserved';
+export type RoomType = 'standard' | 'deluxe' | 'executive' | 'presidential';
 
 export interface Room {
   id: string;
@@ -50,6 +55,7 @@ export interface Guest {
   email: string | null;
   phone: string | null;
   address: string | null;
+  id_type: IdType | null;
   id_number: string | null;
   company: string | null;
   created_at: string;
@@ -67,7 +73,10 @@ export interface Booking {
   status: BookingStatus;
   booking_reference: string;
   assigned_by: string | null;
-  total_amount: number | null;
+  subtotal: number | null;
+  gst_rate: number | null;
+  gst_amount: number | null;
+  total_amount: number | null; // grand total incl. GST
   payment_status: PaymentStatus;
   notes: string | null;
   created_at: string;

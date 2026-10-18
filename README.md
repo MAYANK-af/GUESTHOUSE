@@ -1,132 +1,95 @@
 # GuestHouse Pro 🏨
 
-> A modern, full-featured Guest House Management System built with **React 18**, **TypeScript**, **Tailwind CSS**, and **Supabase / Local Offline Engine**. Featuring Indian Rupee (₹ / INR) localization, authentic guest & staff registries, real-time room availability, interactive reservation calendar, and automated reporting.
+> A full-featured Guest House Management System built with **React 18**, **TypeScript**, **Tailwind CSS** and **Supabase / a local offline engine**. Room-state machine, double-booking prevention, GST invoicing, Aadhaar-validated guest registry, four-layer role-based access control and 91 automated tests.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-GitHub_Pages-2ea44f?style=for-the-badge&logo=github)](https://mayank-af.github.io/GUESTHOUSE/)
-[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
----
+- 🚀 **Live demo:** https://mayank-af.github.io/GUESTHOUSE/ (runs on the offline engine; data stays in your browser)
+- 📦 **Repository:** https://github.com/MAYANK-af/GUESTHOUSE
 
-## 🌐 Live Application Links
-
-- 🚀 **Live Demo on GitHub Pages**: [https://mayank-af.github.io/GUESTHOUSE/](https://mayank-af.github.io/GUESTHOUSE/)
-- 📦 **GitHub Repository**: [https://github.com/MAYANK-af/GUESTHOUSE](https://github.com/MAYANK-af/GUESTHOUSE)
+![Dashboard](./public/screenshots/dashboard.png)
 
 ---
 
-## 📸 Preview
+## ✨ Features
 
-![GuestHouse Pro Dashboard](./public/screenshots/dashboard.png)
+### 🛏️ Rooms and the room state machine
+- Four categories: **Standard, Deluxe, Executive, Presidential**, priced per night in ₹.
+- Five states: `available`, `reserved`, `occupied`, `cleaning`, `maintenance`. Only legal transitions are accepted: an occupied room can never go straight to available; check-out sends it to **cleaning**, and it is released by *Mark clean*.
+- Rooms under maintenance cannot be booked.
 
----
+![Rooms](./public/screenshots/rooms-admin.png)
 
-## ✨ Key Features
+### 📅 Bookings, collision prevention and GST
+- Calendar and list views; one-click check-in and check-out.
+- **Double-booking is impossible:** the service layer rejects any overlapping stay for a room (same-day turnover allowed), and the database has an `EXCLUDE` constraint as a second line of defence.
+- **GST by slab** (hotel rooms, per room per night): **5% up to ₹7,500, 18% above** (rates in force from 22 Sep 2025; edit the constants in `src/lib/booking.ts` if the notification changes). Subtotal, rate, GST and total are frozen on the booking and shown as an invoice.
+- Live price preview and live conflict warning in the booking form.
 
-### 1. 🛏️ Room Management
-- Categorize rooms into **Single** or **Double** layouts across different floors.
-- Real-time room status tracking: `Available`, `Occupied`, `Reserved`, and `Maintenance`.
-- Duty Manager capability to mark rooms out of order with maintenance logs and repair notes.
-- Price configuration in **Indian Rupees (₹ / INR)** per night.
+![Booking with GST](./public/screenshots/booking-gst.png)
+![Conflict blocked](./public/screenshots/conflict-blocked.png)
 
-### 2. 📅 Booking & Reservation System
-- **Interactive Calendar View** and **List View** for all bookings.
-- Real-time availability updates and date clash prevention.
-- Instant 1-click **Check-In** and **Check-Out** state machine:
-  - Check-in automatically marks rooms as `Occupied` and broadcasts arrival alerts.
-  - Check-out automatically frees up rooms to `Available`.
-- Automatic tariff calculation based on nights stayed and room type rates.
+### 👥 Guests
+- Corporate guest registry with stay history.
+- Identity proof: **Aadhaar (12 digits + Verhoeff checksum)**, passport, driving licence, voter ID. Numbers are masked on screen (last 4 characters only).
 
-### 3. 👥 Guest Registry & Corporate Accounts
-- Complete directory storing names, emails, phone numbers (+91), addresses, and ID/passport numbers.
-- Corporate affiliation tracking (TCS, Infosys, Wipro, HCL Tech, Reliance).
-- **Stay History**: Dedicated modal to inspect past and active stays with total INR expenditure.
+### 📊 Reports
+- Filters by month, year, employee and room; revenue incl. GST, collected, pending, GST billed, nights; cancelled bookings excluded.
+- CSV export with quote escaping and spreadsheet-formula protection.
 
-### 4. 📊 Monthly Allocation & Financial Reports
-- Multi-dimensional filters: by **Month**, **Year**, **Employee Name**, and **Room Number**.
-- Key Metrics: Total Bookings, Total Revenue (₹), Collected Revenue (₹), Pending Revenue (₹), Total Nights.
-- Room-by-room revenue allocation tables.
-- Employee booking assignment breakdown.
-- **1-Click CSV Export** for offline corporate accounting and audits.
+![Reports](./public/screenshots/reports.png)
 
-### 5. 🔔 Notifications & Real-Time Alerts
-- Guest arrival and check-in alerts.
-- Check-out completion logs.
-- Pending payment reminder notifications.
-- Maintenance logs logged by duty managers.
-- Unread badge counter and "Mark All Read" quick action.
+### 🔒 Role-based access control (4 layers)
+| Permission | Admin | Front-Desk Staff | Duty Manager |
+|---|:-:|:-:|:-:|
+| View rooms, guests, bookings, notifications | ✅ | ✅ | ✅ |
+| Add / edit / delete rooms | ✅ | – | – |
+| Put room in / out of maintenance | ✅ | – | ✅ |
+| Mark cleaned room available | ✅ | ✅ | ✅ |
+| Add / edit guests | ✅ | ✅ | – |
+| Create / edit / cancel bookings | ✅ | ✅ | – |
+| Check in / check out | ✅ | ✅ | ✅ |
+| Delete bookings or guests | ✅ | – | – |
+| Reports and CSV export | ✅ | – | ✅ |
 
-### 6. 🔒 Role-Based Access Control (RBAC)
-- **Admin** (`Rajesh Sharma`): Full control over rooms, bookings, staff, and financial reports.
-- **Front Desk Staff** (`Sunita Mehra`): Guest management, reservation handling, check-in/out.
-- **Duty Manager** (`Vikramaditya Rao`): Room maintenance updates, out-of-order logs, allocation reviews.
-- Instant 1-click demo login buttons for testing each role immediately.
-
-### 7. 🇮🇳 Indian Currency & Context Localization
-- All pricing, revenue totals, room rates, and invoice values formatted in **₹ (INR)** using Indian numbering (`en-IN`).
-- Authentic Indian guest profiles, phone numbers, and addresses.
+Enforced in the UI (navigation, controls, route guard), the service layer, PostgreSQL Row-Level Security and database constraints. New production accounts are always `staff`; users cannot change their own role.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech stack
+React 18, TypeScript (strict), Vite, Tailwind CSS, Lucide · Supabase JS or an offline localStorage engine with the same query API · PostgreSQL (RLS, exclusion constraint) · Vitest, Testing Library, PGlite · GitHub Actions → GitHub Pages.
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide React Icons
-- **State Management & Querying**: PostgREST / Supabase JS Client with seamless LocalStorage offline fallback engine
-- **Database**: PostgreSQL (Supabase schema with full Row-Level Security policies)
-- **Deployment**: GitHub Pages with automated GitHub Actions CI/CD workflow
+## 🚀 Getting started
+```bash
+git clone https://github.com/MAYANK-af/GUESTHOUSE.git
+cd GUESTHOUSE
+npm install
+npm run dev        # http://localhost:5173 (offline engine by default)
+```
 
----
+## ✅ Quality gates
+```bash
+npm run lint        # ESLint
+npm run typecheck   # TypeScript strict
+npm test            # 91 tests: unit, service integration, database (real SQL migrations on PostgreSQL), UI
+npm run build       # production bundle
+```
+The CI workflow runs all four before every deployment. Tests always use the offline engine, even if a local `.env` has Supabase keys.
 
-## 🚀 Getting Started
-
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [npm](https://www.npmjs.com/)
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/MAYANK-af/GUESTHOUSE.git
-   cd GUESTHOUSE
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Start the local development server:**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-4. **Build for production:**
-   ```bash
-   npm run build
-   ```
-
----
-
-## ⚙️ Optional Supabase Connection
-
-The project is pre-configured with a zero-setup offline fallback engine, meaning **it works out of the box with zero external dependencies**.
-
-To connect to your own cloud Supabase database:
-1. Update `.env` with your project credentials:
+## ⚙️ Optional Supabase connection
+1. Put your credentials in `.env` (never commit it):
    ```env
    VITE_SUPABASE_URL=https://<your-project-id>.supabase.co
    VITE_SUPABASE_ANON_KEY=<your-anon-public-key>
    ```
-2. Execute the migration file located at:
-   `supabase/migrations/20261011125236_create_guesthouse_schema.sql`
-   in your Supabase SQL Editor.
+2. In the Supabase SQL editor run, **in order**:
+   - `supabase/migrations/20261011125236_create_guesthouse_schema.sql`
+   - `supabase/migrations/20261012090000_v2_rbac_gst_fsm.sql`
+3. Promote your first administrator in SQL: `update profiles set role = 'admin' where id = '<your-user-id>';`
 
----
+## ⚠️ Known limitations
+The engine (Supabase or offline) is chosen once at start-up; there is no automatic failover or offline sync. With Supabase, booking + room update + notification are separate requests (the exclusion constraint still prevents double-booking). GST ignores the CGST/SGST split, GSTIN/SAC and the input-credit condition of the 5% slab. Identity numbers are stored unencrypted. UI tests run in jsdom, not real browsers.
 
 ## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
+MIT, see [LICENSE](LICENSE).

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Room, type Booking, type Guest } from '@/lib/supabase';
-import { Hotel, CalendarCheck, Users, TrendingUp, ArrowUpRight, ArrowDownRight, IndianRupee, BedDouble, Wrench, Clock } from 'lucide-react';
+import { Hotel, CalendarCheck, Users, TrendingUp, ArrowUpRight, ArrowDownRight, IndianRupee, BedDouble, Wrench, Clock, Sparkles } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
+import { todayISO } from '@/lib/booking';
 
 export default function Dashboard() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -24,7 +25,7 @@ export default function Dashboard() {
       setGuests(guestsRes.data as Guest[] ?? []);
       setLoading(false);
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = todayISO(); // local date (toISOString() is UTC and is wrong for IST mornings)
       setTodayCheckIns((bookingsRes.data as Booking[] ?? []).filter(b => b.check_in_date === today && b.status === 'confirmed'));
       setTodayCheckOuts((bookingsRes.data as Booking[] ?? []).filter(b => b.check_out_date === today && b.status === 'checked_in'));
     }
@@ -186,7 +187,7 @@ export default function Dashboard() {
               <div key={room.id} className="rounded-xl border border-slate-200 p-3 hover:shadow-sm transition-shadow">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold text-slate-900">{room.room_number}</span>
-                  {room.room_type === 'double' ? <BedDouble className="w-4 h-4 text-slate-400" /> : <Hotel className="w-4 h-4 text-slate-400" />}
+                  {room.room_type !== 'standard' ? <BedDouble className="w-4 h-4 text-slate-400" /> : <Hotel className="w-4 h-4 text-slate-400" />}
                 </div>
                 <StatusBadge status={room.status} />
                 <p className="text-xs text-slate-400 mt-2">₹{room.price_per_night.toLocaleString('en-IN')}/night</p>
@@ -222,8 +223,8 @@ export default function Dashboard() {
       {/* Quick stats footer */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: BedDouble, label: 'Double Rooms', value: rooms.filter(r => r.room_type === 'double').length, color: 'text-violet-600 bg-violet-50' },
-          { icon: Hotel, label: 'Single Rooms', value: rooms.filter(r => r.room_type === 'single').length, color: 'text-sky-600 bg-sky-50' },
+          { icon: BedDouble, label: 'Deluxe & Suites', value: rooms.filter(r => r.room_type !== 'standard').length, color: 'text-violet-600 bg-violet-50' },
+          { icon: Sparkles, label: 'Awaiting Cleaning', value: rooms.filter(r => r.status === 'cleaning').length, color: 'text-sky-600 bg-sky-50' },
           { icon: Wrench, label: 'Under Maintenance', value: maintenanceRooms, color: 'text-amber-600 bg-amber-50' },
           { icon: Clock, label: 'Pending Payments', value: bookings.filter(b => b.payment_status === 'pending').length, color: 'text-red-600 bg-red-50' },
         ].map(({ icon: Icon, label, value, color }) => (

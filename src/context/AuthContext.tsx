@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { supabase, type Profile, type UserRole } from '@/lib/supabase';
+import { supabase, isMockMode, type Profile, type UserRole } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setSession(session);
       if (session) {
         fetchProfile(session.user.id);
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
       setSession(session);
       if (session) {
         (async () => {
@@ -67,14 +67,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        data: { full_name: fullName, role },
+        // Production: the DB trigger always creates 'staff' accounts; an admin promotes users. Demo mode honours the picker.
+        data: isMockMode ? { full_name: fullName, role } : { full_name: fullName },
       },
     });
     if (error) return { error: error.message };
     if (data.user) {
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({ id: data.user.id, full_name: fullName, role });
+        .upsert({ id: data.user.id, full_name: fullName, role: isMockMode ? role : 'staff' });
       if (profileError) return { error: profileError.message };
     }
     return { error: null };

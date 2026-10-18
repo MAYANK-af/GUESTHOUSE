@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { supabase, type Notification } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import AuthPage from '@/pages/AuthPage';
 import Layout, { type PageKey } from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
@@ -10,9 +10,10 @@ import Guests from '@/pages/Guests';
 import Reports from '@/pages/Reports';
 import Notifications from '@/pages/Notifications';
 import { Loader2 } from 'lucide-react';
+import { can, PAGE_PERMISSION } from '@/lib/permissions';
 
 function AppContent() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<PageKey>('dashboard');
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -57,9 +58,12 @@ function AppContent() {
     notifications: <Notifications />,
   };
 
+  // Route guard: a role without permission for the requested page falls back to the dashboard.
+  const page: PageKey = can(profile?.role, PAGE_PERMISSION[currentPage]) ? currentPage : 'dashboard';
+
   return (
-    <Layout currentPage={currentPage} onNavigate={setCurrentPage} unreadCount={unreadCount}>
-      {pages[currentPage]}
+    <Layout currentPage={page} onNavigate={setCurrentPage} unreadCount={unreadCount}>
+      {pages[page]}
     </Layout>
   );
 }

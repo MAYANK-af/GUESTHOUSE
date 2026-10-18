@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Building2, Lock, Mail, User, Shield, Loader2, Hotel, Calendar, Users, Bell } from 'lucide-react';
-import type { UserRole } from '@/lib/supabase';
+import { isMockMode, type UserRole } from '@/lib/supabase';
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth();
@@ -149,9 +149,9 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              {mode === 'signup' && (
+              {mode === 'signup' && isMockMode && (
                 <div>
-                  <label className="label-field">Role</label>
+                  <label className="label-field">Role (demo mode only)</label>
                   <div className="relative">
                     <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <select
@@ -179,7 +179,7 @@ export default function AuthPage() {
               </button>
             </form>
 
-            {mode === 'signin' && (
+            {mode === 'signin' && isMockMode && (
               <div className="mt-6 pt-6 border-t border-slate-200">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 text-center">
                   Instant Demo Access
