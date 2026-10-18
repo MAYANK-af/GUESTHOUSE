@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { can, PAGE_PERMISSION } from '@/lib/permissions';
-import { Building2, LayoutDashboard, Hotel, CalendarDays, Users, BarChart3, Bell, LogOut, Menu, X, Shield } from 'lucide-react';
+import { Building2, LayoutDashboard, Hotel, CalendarDays, Users, BarChart3, Bell, LogOut, Menu, X, Shield, Sparkles } from 'lucide-react';
+import AICopilotModal from './AICopilotModal';
 
 export type PageKey = 'dashboard' | 'rooms' | 'bookings' | 'guests' | 'reports' | 'notifications';
 
@@ -24,7 +25,19 @@ const navItems: { key: PageKey; label: string; icon: typeof LayoutDashboard }[] 
 export default function Layout({ currentPage, onNavigate, children, unreadCount }: LayoutProps) {
   const { profile, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const visibleNav = navItems.filter(({ key }) => can(profile?.role, PAGE_PERMISSION[key]));
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCopilotOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const roleColors: Record<string, string> = {
     admin: 'bg-violet-100 text-violet-700',
@@ -67,6 +80,22 @@ export default function Layout({ currentPage, onNavigate, children, unreadCount 
             </button>
           ))}
         </nav>
+
+        <div className="px-3 pb-3">
+          <button
+            type="button"
+            onClick={() => setCopilotOpen(true)}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-100 text-sky-800 hover:from-sky-100 hover:to-indigo-100 transition-all text-xs font-semibold shadow-xs group"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-sky-600 group-hover:scale-110 transition-transform" />
+              <span>AI Copilot</span>
+            </div>
+            <span className="text-[10px] bg-white/80 border border-sky-200 px-1.5 py-0.5 rounded text-slate-500 font-mono">
+              Ctrl+K
+            </span>
+          </button>
+        </div>
 
         <div className="px-3 py-4 border-t border-slate-200">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-50">
@@ -166,6 +195,23 @@ export default function Layout({ currentPage, onNavigate, children, unreadCount 
           {children}
         </div>
       </main>
+
+      {/* Floating AI Copilot Trigger */}
+      <button
+        type="button"
+        onClick={() => setCopilotOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all text-sm font-semibold group"
+      >
+        <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+        <span className="hidden sm:inline">AI Copilot</span>
+        <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">Ctrl+K</span>
+      </button>
+
+      <AICopilotModal
+        isOpen={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        onRefreshData={() => onNavigate(currentPage)}
+      />
     </div>
   );
 }

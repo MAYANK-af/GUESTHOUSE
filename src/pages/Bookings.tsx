@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, type Booking, type Guest, type Room, type BookingStatus, type PaymentStatus } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { Plus, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, X, Loader2, Trash2, Pencil, Receipt, AlertTriangle } from 'lucide-react';
+import { Plus, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, X, Loader2, Trash2, Pencil, Receipt, AlertTriangle, Sparkles } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
 import { can } from '@/lib/permissions';
 import { calcNights, computeInvoice, findConflict, formatINR } from '@/lib/booking';
 import { BOOKING_TRANSITIONS, type BookingStatusFsm } from '@/lib/roomFsm';
 import { BookingError, changeBookingStatus, createBooking, updateBooking } from '@/lib/bookingService';
+import { rankRooms } from '@/lib/roomRecommender';
 
 export default function Bookings() {
   const { profile } = useAuth();
@@ -346,6 +347,60 @@ export default function Bookings() {
               </select>
             </div>
           </div>
+
+          {/* AI Smart Room Suggestions */}
+          {!editingBooking && guestId && (() => {
+            const selectedGuest = guests.find(g => g.id === guestId);
+            const recommendations = rankRooms(rooms, selectedGuest, bookings);
+            if (!recommendations.length) return null;
+
+            return (
+              <div className="p-3 bg-gradient-to-r from-sky-50/80 to-indigo-50/80 border border-sky-100 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                    AI Smart Room Suggestions:
+                  </span>
+                  {selectedGuest?.company && (
+                    <span className="text-[11px] text-sky-800 bg-sky-100 px-2 py-0.5 rounded-full font-medium">
+                      Tariff Policy: {selectedGuest.company}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {recommendations.slice(0, 2).map((rec) => (
+                    <button
+                      key={rec.room.id}
+                      type="button"
+                      onClick={() => setRoomId(rec.room.id)}
+                      className={`p-2.5 rounded-lg border text-left transition-all ${
+                        roomId === rec.room.id
+                          ? 'border-sky-500 bg-white shadow-sm ring-1 ring-sky-500'
+                          : 'border-slate-200/80 bg-white/80 hover:bg-white hover:border-sky-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-900">
+                          Room {rec.room.room_number} ({rec.room.room_type})
+                        </span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          rec.isTopPick ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'
+                        }`}>
+                          {rec.score}% Match
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                        {rec.reasons[0]}
+                      </p>
+                      <p className="text-[11px] font-semibold text-slate-700 mt-1">
+                        {formatINR(rec.room.price_per_night)}/night
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

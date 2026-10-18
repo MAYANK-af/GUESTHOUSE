@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, type Guest, type Booking } from '@/lib/supabase';
-import { Plus, Pencil, Trash2, Search, Loader2, Users, Mail, Phone, MapPin, Building, Calendar, History } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Loader2, Users, Mail, Phone, MapPin, Building, Calendar, History, Sparkles } from 'lucide-react';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
+import IdScannerModal from '@/components/IdScannerModal';
+import type { ExtractedIdData } from '@/lib/aiService';
 import { useAuth } from '@/context/AuthContext';
 import { can } from '@/lib/permissions';
 import { ID_TYPES, maskId, normalizeId, validateId, type IdType } from '@/lib/identity';
@@ -22,6 +24,19 @@ export default function Guests() {
   const [search, setSearch] = useState('');
   const [historyModal, setHistoryModal] = useState<Guest | null>(null);
   const [guestBookings, setGuestBookings] = useState<Booking[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  function handleScanComplete(data: ExtractedIdData) {
+    setEditingGuest(null);
+    setFirstName(data.first_name);
+    setLastName(data.last_name);
+    setIdType(data.id_type);
+    setIdNumber(data.id_number);
+    if (data.company) setCompany(data.company);
+    if (data.address) setAddress(data.address);
+    setIdError(null);
+    setModalOpen(true);
+  }
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -127,10 +142,20 @@ export default function Guests() {
           <p className="text-sm text-slate-500 mt-1">Manage guest profiles and view stay history</p>
         </div>
         {canManage && (
-          <button onClick={openAdd} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Add Guest
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="btn btn-secondary flex items-center gap-2 border-sky-300 text-sky-700 bg-sky-50/50 hover:bg-sky-100/80 transition-all shadow-sm"
+            >
+              <Sparkles className="w-4 h-4 text-sky-600" />
+              <span>AI Scan ID</span>
+            </button>
+            <button onClick={openAdd} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Add Guest
+            </button>
+          </div>
         )}
       </div>
 
@@ -300,6 +325,12 @@ export default function Guests() {
           </div>
         )}
       </Modal>
+
+      <IdScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanComplete={handleScanComplete}
+      />
     </div>
   );
 }

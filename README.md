@@ -1,6 +1,6 @@
 # GuestHouse Pro 🏨
 
-> A full-featured Guest House Management System built with **React 18**, **TypeScript**, **Tailwind CSS** and **Supabase / a local offline engine**. Room-state machine, double-booking prevention, GST invoicing, Aadhaar-validated guest registry, four-layer role-based access control and 91 automated tests.
+> A full-featured Guest House Management System built with **React 18**, **TypeScript**, **Tailwind CSS** and **Supabase / a local offline engine**. AI Front-Desk Copilot, Gemini Vision ID Scanner, Smart Room Recommender, room-state machine, double-booking prevention, GST invoicing, Aadhaar-validated guest registry, four-layer role-based access control and 101 automated tests.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-GitHub_Pages-2ea44f?style=for-the-badge&logo=github)](https://mayank-af.github.io/GUESTHOUSE/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
@@ -13,6 +13,27 @@
 ---
 
 ## ✨ Features
+
+### 🤖 Front-Desk AI Copilot (Natural Language Assistant)
+- Press **Ctrl+K** or click the **AI Copilot** button to open the interactive assistant.
+- Powered by **Gemini Flash models** with intelligent model-fallback and full offline rule-based NLP fallback.
+- Multi-turn conversation awareness: handles sequential follow-up instructions (e.g., *"Book Room 401"*, followed by *"Mayank check in date 10/11/26 to 13/11/26 payment status is pending"*).
+- Instant front-desk actions: natural-language room bookings, room maintenance logging, cleaning releases, check-in / check-out, and GST inquiries with one-click confirmation chips.
+- Automatic date normalization from `DD/MM/YY` or relative dates to ISO `YYYY-MM-DD`.
+- On-the-fly guest provisioning for new guests.
+
+### 🪪 Smart ID Document Scanner & Auto-Fill (Vision AI)
+- Built with **Gemini Vision OCR** and pre-configured offline sample cards.
+- Supports webcam capture or document upload for Indian identities (**Aadhaar card, Passport, Driving License, Voter ID**).
+- Automatically parses and populates full name, document type, unmasked ID number, company, and address directly into the guest registry form.
+
+### 🧠 Smart Room Recommendation Engine
+- Ranks and scores free rooms based on:
+  - **Guest budget ceiling & company tariff agreements** (Tata, Infosys, Reliance, Wipro, HCL).
+  - **Past guest stay history & preferred room categories**.
+  - **Floor preference** (e.g., Ground floor for accessibility vs. higher floors for executive quietness).
+  - **Live room turnover availability**.
+- Shows high-confidence match badges (e.g., *95% Match - Corporate Tariff Fit*) in the booking workflow.
 
 ### 🛏️ Rooms and the room state machine
 - Four categories: **Standard, Deluxe, Executive, Presidential**, priced per night in ₹.
@@ -72,7 +93,7 @@ npm run dev        # http://localhost:5173 (offline engine by default)
 ```bash
 npm run lint        # ESLint
 npm run typecheck   # TypeScript strict
-npm test            # 91 tests: unit, service integration, database (real SQL migrations on PostgreSQL), UI
+npm test            # 101 tests: unit, service integration, database (real SQL migrations on PostgreSQL), UI
 npm run build       # production bundle
 ```
 The CI workflow runs all four before every deployment. Tests always use the offline engine, even if a local `.env` has Supabase keys.
