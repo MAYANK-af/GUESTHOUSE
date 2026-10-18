@@ -1,8 +1,9 @@
-// Indian guest identity-document validation (Aadhaar with Verhoeff checksum, passport, DL, voter ID).
-export type IdType = 'aadhaar' | 'passport' | 'driving_license' | 'voter_id' | 'other';
+// Indian guest identity-document validation (Aadhaar with Verhoeff checksum, PAN, passport, DL, voter ID).
+export type IdType = 'aadhaar' | 'pan' | 'passport' | 'driving_license' | 'voter_id' | 'other';
 
 export const ID_TYPES: { value: IdType; label: string; hint: string }[] = [
   { value: 'aadhaar', label: 'Aadhaar', hint: '12 digits' },
+  { value: 'pan', label: 'PAN Card', hint: '10 chars (e.g. ABCDE1234F)' },
   { value: 'passport', label: 'Passport', hint: 'e.g. K1234567' },
   { value: 'driving_license', label: 'Driving Licence', hint: 'e.g. RJ14 20110012345' },
   { value: 'voter_id', label: 'Voter ID (EPIC)', hint: 'e.g. ABC1234567' },
@@ -54,6 +55,8 @@ export function validateId(type: IdType, value: string): string | null {
       if (!/^[2-9]\d{11}$/.test(v)) return 'Aadhaar must be 12 digits and cannot start with 0 or 1';
       if (!verhoeffValid(v)) return 'Aadhaar number failed checksum validation';
       return null;
+    case 'pan':
+      return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v) ? null : 'PAN format: 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F)';
     case 'passport':
       return /^[A-PR-WY][1-9]\d{6}$/.test(v) ? null : 'Passport must be 1 letter followed by 7 digits (e.g. K1234567)';
     case 'driving_license':

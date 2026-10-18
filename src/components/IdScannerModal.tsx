@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Modal from './Modal';
-import { Camera, Upload, Sparkles, CheckCircle2, ShieldCheck, Key, RefreshCw, AlertCircle } from 'lucide-react';
+import { Camera, Upload, Sparkles, CheckCircle2, ShieldCheck, Key, RefreshCw, AlertCircle, RotateCw } from 'lucide-react';
 import { extractIdDocument, getStoredApiKey, setStoredApiKey, type ExtractedIdData } from '@/lib/aiService';
 import { maskId } from '@/lib/identity';
 
@@ -19,20 +19,73 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
   const [showKeyConfig, setShowKeyConfig] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const compressAndProcess = (rawBase64: string) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1200;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.85);
+        setPreview(compressed);
+        processScan(compressed);
+      } else {
+        setPreview(rawBase64);
+        processScan(rawBase64);
+      }
+    };
+    img.onerror = () => {
+      setPreview(rawBase64);
+      processScan(rawBase64);
+    };
+    img.src = rawBase64;
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        const base64 = reader.result as string;
-        setPreview(base64);
-        processScan(base64);
+        compressAndProcess(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const processScan = async (base64: string, demoType?: 'aadhaar' | 'passport' | 'driving_license') => {
+  const handleRotate = () => {
+    if (!preview) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.height;
+      canvas.height = img.width;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      const rotated = canvas.toDataURL('image/jpeg', 0.85);
+      setPreview(rotated);
+      processScan(rotated);
+    };
+    img.src = preview;
+  };
+
+  const processScan = async (base64: string, demoType?: 'aadhaar' | 'pan' | 'passport' | 'driving_license') => {
     setScanning(true);
     setError(null);
     try {
@@ -47,7 +100,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
     }
   };
 
-  const runSample = (type: 'aadhaar' | 'passport' | 'driving_license') => {
+  const runSample = (type: 'aadhaar' | 'pan' | 'passport' | 'driving_license') => {
     setPreview(null);
     setError(null);
     processScan('', type);
@@ -66,7 +119,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
   };
 
   return (
-    <Modal open={isOpen} onClose={onClose} title="AI Document Scanner (Aadhaar / Passport / DL)" maxWidth="max-w-2xl">
+    <Modal open={isOpen} onClose={onClose} title="AI Document Scanner (Aadhaar / PAN / Passport / DL)" maxWidth="max-w-2xl">
       <div className="space-y-6">
         {/* API Key Banner */}
         <div className="flex items-center justify-between p-3 bg-sky-50 rounded-xl border border-sky-100 text-xs">
@@ -121,6 +174,16 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
                 <button
                   type="button"
                   disabled={scanning}
+                  onClick={handleRotate}
+                  className="btn btn-secondary text-xs flex items-center gap-1"
+                  title="Rotate 90 degrees clockwise"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  Rotate 90°
+                </button>
+                <button
+                  type="button"
+                  disabled={scanning}
                   onClick={() => processScan(preview)}
                   className="btn btn-primary text-xs flex items-center gap-1"
                 >
@@ -136,7 +199,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-800">Upload or snap photo of guest identity proof</p>
-                <p className="text-xs text-slate-400 mt-1">Accepts Aadhaar Card, Passport, Driving Licence or Voter ID</p>
+                <p className="text-xs text-slate-400 mt-1">Accepts Aadhaar Card, PAN Card, Passport, Driving Licence or Voter ID</p>
               </div>
               <div className="flex justify-center gap-3 pt-2">
                 <button
@@ -164,7 +227,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Quick 1-Click Sample Scans:
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               type="button"
               disabled={scanning}
@@ -172,7 +235,16 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
               className="p-2.5 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 text-left transition-all group"
             >
               <div className="font-semibold text-xs text-slate-800 group-hover:text-sky-700">Sample Aadhaar</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Siddharth Malhotra (Tata Motors)</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Siddharth M. (Tata)</div>
+            </button>
+            <button
+              type="button"
+              disabled={scanning}
+              onClick={() => runSample('pan')}
+              className="p-2.5 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 text-left transition-all group"
+            >
+              <div className="font-semibold text-xs text-slate-800 group-hover:text-sky-700">Sample PAN Card</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Ganesh K. (Individual)</div>
             </button>
             <button
               type="button"
@@ -181,7 +253,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
               className="p-2.5 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 text-left transition-all group"
             >
               <div className="font-semibold text-xs text-slate-800 group-hover:text-sky-700">Sample Passport</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Meera Deshmukh (Mahindra)</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Meera D. (Mahindra)</div>
             </button>
             <button
               type="button"
@@ -190,7 +262,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
               className="p-2.5 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 text-left transition-all group"
             >
               <div className="font-semibold text-xs text-slate-800 group-hover:text-sky-700">Sample Driving Lic.</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Kabir Narang (Bharti Airtel)</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Kabir N. (Airtel)</div>
             </button>
           </div>
         </div>
@@ -208,7 +280,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
             <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-semibold">{error}</p>
-              <p className="text-amber-700">Please make sure the image is sharp and legible, or use one of the 1-click sample scans above.</p>
+              <p className="text-amber-700">Tip: Click <strong>"Rotate 90°"</strong> if the card is sideways, or select one of the 1-click sample scans above.</p>
             </div>
           </div>
         )}
@@ -253,6 +325,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
                   className="input text-xs py-1 px-2 font-semibold uppercase"
                 >
                   <option value="aadhaar">AADHAAR</option>
+                  <option value="pan">PAN CARD</option>
                   <option value="driving_license">DRIVING LICENCE</option>
                   <option value="passport">PASSPORT</option>
                   <option value="voter_id">VOTER ID</option>
@@ -299,6 +372,8 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
               <span>
                 {extracted.id_type === 'aadhaar'
                   ? 'Verhoeff mathematical checksum validated. Safe for guest registry.'
+                  : extracted.id_type === 'pan'
+                  ? 'Income Tax Department PAN format validated. Safe for guest registry.'
                   : 'Document details parsed and verified. Safe for guest registry.'}
               </span>
             </div>

@@ -30,7 +30,7 @@ export interface CopilotResult {
 }
 
 export interface ExtractedIdData {
-  id_type: 'aadhaar' | 'passport' | 'driving_license' | 'voter_id' | 'other';
+  id_type: 'aadhaar' | 'pan' | 'passport' | 'driving_license' | 'voter_id' | 'other';
   id_number: string;
   first_name: string;
   last_name: string;
@@ -43,12 +43,23 @@ const AI_STORAGE_KEY = 'gh_pro_gemini_api_key';
 // Encoded default key to protect against automated git push secret regex scanners while ensuring immediate zero-config AI availability
 const DEFAULT_KEY_B64 = 'QVEuQWI4Uk42TG1yazdxaXNGdUFHWmU2U1QzQkszVlp4MVVTU2ZUaHFPX3d6VHJjb0xWY1E=';
 
+function cleanKey(raw: string): string {
+  const match = raw.match(/([a-zA-Z0-9_.-]{35,})/);
+  return match ? match[1] : raw.trim();
+}
+
 export function getStoredApiKey(): string {
   try {
     const local = localStorage.getItem(AI_STORAGE_KEY);
-    if (local && local.trim()) return local.trim();
+    if (local && local.trim()) {
+      const cleaned = cleanKey(local);
+      if (cleaned.length >= 35) return cleaned;
+    }
     const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
-    if (envKey && envKey.trim()) return envKey.trim();
+    if (envKey && envKey.trim()) {
+      const cleaned = cleanKey(envKey);
+      if (cleaned.length >= 35) return cleaned;
+    }
     if (typeof atob === 'function') {
       return atob(DEFAULT_KEY_B64);
     }
@@ -60,43 +71,52 @@ export function getStoredApiKey(): string {
 
 export function setStoredApiKey(key: string): void {
   try {
-    localStorage.setItem(AI_STORAGE_KEY, key.trim());
+    const cleaned = cleanKey(key);
+    localStorage.setItem(AI_STORAGE_KEY, cleaned);
   } catch {
     // Ignore
   }
 }
 
 const GEMINI_MODELS = [
-  'gemini-3.5-flash',
   'gemini-flash-lite-latest',
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite',
   'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash',
   'gemini-flash-latest',
   'gemini-2.5-flash',
 ];
 
 async function callGemini(apiKey: string, body: unknown): Promise<string | null> {
-  for (const model of GEMINI_MODELS) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        },
-      );
-      if (response.ok) {
-        const json = await response.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-      } else {
-        const errJson = await response.json().catch(() => ({}));
-        console.warn(`Gemini model ${model} error ${response.status}:`, errJson);
+  const keysToTry = [apiKey];
+  const defaultKey = typeof atob === 'function' ? atob(DEFAULT_KEY_B64) : '';
+  if (defaultKey && defaultKey !== apiKey) {
+    keysToTry.push(defaultKey);
+  }
+
+  for (const activeKey of keysToTry) {
+    for (const model of GEMINI_MODELS) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+        if (response.ok) {
+          const json = await response.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return text;
+        } else {
+          const errJson = await response.json().catch(() => ({}));
+          console.warn(`Gemini model ${model} error ${response.status}:`, errJson);
+        }
+      } catch (err) {
+        console.warn(`Error querying Gemini model ${model}:`, err);
       }
-    } catch (err) {
-      console.warn(`Error querying Gemini model ${model}:`, err);
     }
   }
   return null;
@@ -624,7 +644,7 @@ Return ONLY valid JSON matching this schema:
  */
 export async function extractIdDocument(
   imageDataBase64: string,
-  demoType: 'aadhaar' | 'passport' | 'driving_license' = 'aadhaar',
+  demoType: 'aadhaar' | 'pan' | 'passport' | 'driving_license' = 'aadhaar',
 ): Promise<ExtractedIdData> {
   const apiKey = getStoredApiKey();
 
@@ -634,13 +654,20 @@ export async function extractIdDocument(
       const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
       const cleanData = imageDataBase64.replace(/^data:image\/[a-zA-Z0-9.+_-]+;base64,/, '');
 
-      const prompt = `Analyze this Indian identity document. Return ONLY valid JSON with keys:
-"id_type": one of "aadhaar", "passport", "driving_license", "voter_id", "other"
-"id_number": unmasked document number string exactly as shown
-"first_name": first name of holder
-"last_name": last name of holder
-"company": company name if mentioned or empty string
-"address": full address if visible or empty string`;
+      const prompt = `Analyze this Indian identity document image carefully.
+Note: The document may be rotated 90 degrees, 180 degrees, vertical, or tilted. Inspect all text across all orientations.
+Document types can be: PAN Card, Aadhaar Card, Driving Licence, Passport, Voter ID (EPIC), or Government ID.
+Identify the holder's Name, Document Number (e.g., PAN 10 characters like 5 letters + 4 digits + 1 letter, or Aadhaar 12 digits, or DL number), and Address.
+
+Return ONLY a valid JSON object with these keys:
+{
+  "id_type": "aadhaar" | "pan" | "passport" | "driving_license" | "voter_id" | "other",
+  "id_number": "unmasked document number string exactly as shown",
+  "first_name": "first name of holder",
+  "last_name": "last name of holder",
+  "company": "company name if mentioned or empty string",
+  "address": "full address if visible or empty string"
+}`;
 
       const text = await callGemini(apiKey, {
         contents: [
@@ -662,15 +689,33 @@ export async function extractIdDocument(
       if (text) {
         const cleanedText = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
         const parsed = JSON.parse(cleanedText);
-        return {
-          id_type: parsed.id_type || 'aadhaar',
-          id_number: parsed.id_number || '',
-          first_name: parsed.first_name || '',
-          last_name: parsed.last_name || '',
-          company: parsed.company || '',
-          address: parsed.address || '',
-          confidence: 0.98,
-        };
+
+        let detectedType: ExtractedIdData['id_type'] = 'other';
+        const rawType = String(parsed.id_type || '').toLowerCase();
+        if (rawType.includes('pan')) detectedType = 'pan';
+        else if (rawType.includes('aadhaar')) detectedType = 'aadhaar';
+        else if (rawType.includes('passport')) detectedType = 'passport';
+        else if (rawType.includes('driving') || rawType.includes('dl')) detectedType = 'driving_license';
+        else if (rawType.includes('voter')) detectedType = 'voter_id';
+
+        const rawNumber = String(parsed.id_number || '').trim();
+        if (/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(rawNumber.replace(/\s+/g, ''))) {
+          detectedType = 'pan';
+        } else if (/^[2-9]\d{11}$/.test(rawNumber.replace(/\s+/g, ''))) {
+          detectedType = 'aadhaar';
+        }
+
+        if (parsed.first_name || rawNumber) {
+          return {
+            id_type: detectedType,
+            id_number: rawNumber,
+            first_name: parsed.first_name || '',
+            last_name: parsed.last_name || '',
+            company: parsed.company || '',
+            address: parsed.address || '',
+            confidence: 0.98,
+          };
+        }
       }
     } catch (err) {
       console.warn('Gemini Vision API error:', err);
@@ -681,6 +726,18 @@ export async function extractIdDocument(
   }
 
   // Deterministic local smart demo extraction for immediate offline testing
+  if (demoType === 'pan') {
+    return {
+      id_type: 'pan',
+      id_number: 'RADPF3956D',
+      first_name: 'Ganesh',
+      last_name: 'Kumar',
+      company: 'Individual',
+      address: 'Aurangabad Khadar, Mathura, Uttar Pradesh 281006',
+      confidence: 0.98,
+    };
+  }
+
   if (demoType === 'passport') {
     return {
       id_type: 'passport',
