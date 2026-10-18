@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 - 🚀 **Live demo:** https://mayank-af.github.io/GUESTHOUSE/ (runs on the offline engine; data stays in your browser)
-- 📦 **Repository:** https://github.com/MAYANK-af/GUESTHOUSE
+
 
 ![Dashboard](./public/screenshots/dashboard.png)
 
