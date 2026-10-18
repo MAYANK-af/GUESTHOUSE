@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Room, type Booking, type Guest } from '@/lib/supabase';
-import { Hotel, CalendarCheck, Users, TrendingUp, ArrowUpRight, ArrowDownRight, IndianRupee, BedDouble, Wrench, Clock, Sparkles } from 'lucide-react';
+import { Hotel, CalendarCheck, Users, TrendingUp, ArrowUpRight, ArrowDownRight, IndianRupee, BedDouble, Wrench, Clock, Sparkles, Bot } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { todayISO } from '@/lib/booking';
 
@@ -69,6 +69,37 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-sm text-slate-500 mt-1">Overview of your guest house operations</p>
+      </div>
+
+      {/* AI Features Spotlight Banner */}
+      <div className="rounded-2xl p-5 bg-gradient-to-r from-sky-900 via-indigo-900 to-slate-900 text-white shadow-lg relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="bg-sky-500/20 text-sky-300 text-xs px-2.5 py-0.5 rounded-full border border-sky-400/30 font-semibold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                AI Suite Active
+              </span>
+              <span className="text-xs text-sky-200">Google Gemini Flash &amp; Vision</span>
+            </div>
+            <h2 className="text-lg font-bold text-white">GuestHouse Pro AI Tools Enabled</h2>
+            <p className="text-xs text-sky-200/80 max-w-2xl leading-relaxed">
+              • <strong>Front-Desk AI Copilot</strong> (Ctrl+K): Conversational bookings, check-out, GST inquiries, and room status updates.<br/>
+              • <strong>Smart ID Document Scanner</strong>: Instant Aadhaar/Passport vision OCR autofill on the Guests page.<br/>
+              • <strong>Smart Room Recommender</strong>: Ranks free rooms by corporate tariff and guest history on Bookings.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <Bot className="w-4 h-4" />
+              Launch AI Copilot (Ctrl+K)
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Stats grid */}

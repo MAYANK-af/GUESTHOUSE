@@ -130,9 +130,20 @@ export default function Layout({ currentPage, onNavigate, children, unreadCount 
           </div>
           <span className="font-bold text-slate-900 text-sm">GuestHouse Pro</span>
         </div>
-        <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-slate-100">
-          <Menu className="w-5 h-5 text-slate-700" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setCopilotOpen(true)}
+            className="p-2 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 flex items-center gap-1 text-xs font-semibold"
+            title="Open AI Copilot"
+          >
+            <Sparkles className="w-4 h-4 text-sky-600 animate-pulse" />
+            <span className="text-[11px]">AI Copilot</span>
+          </button>
+          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-slate-100">
+            <Menu className="w-5 h-5 text-slate-700" />
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
@@ -167,6 +178,21 @@ export default function Layout({ currentPage, onNavigate, children, unreadCount 
                 </button>
               ))}
             </nav>
+            <div className="px-3 pb-3">
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); setCopilotOpen(true); }}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-100 text-sky-800 text-xs font-semibold shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-sky-600" />
+                  <span>AI Copilot</span>
+                </div>
+                <span className="text-[10px] bg-white border border-sky-200 px-1.5 py-0.5 rounded text-slate-500 font-mono">
+                  Open
+                </span>
+              </button>
+            </div>
             <div className="px-3 py-4 border-t border-slate-200">
               <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-50 mb-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white text-xs font-semibold">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
-import { Sparkles, Send, Bot, User, CheckCircle, ArrowRight, CornerDownLeft, Loader2 } from 'lucide-react';
-import { processCopilotQuery, type CopilotResult } from '@/lib/aiService';
+import { Sparkles, Send, Bot, User, CheckCircle, ArrowRight, CornerDownLeft, Loader2, Key } from 'lucide-react';
+import { processCopilotQuery, getStoredApiKey, setStoredApiKey, type CopilotResult } from '@/lib/aiService';
 import { supabase, type Room, type Guest, type Booking } from '@/lib/supabase';
 import { createBooking, setRoomStatus, changeBookingStatus } from '@/lib/bookingService';
 import type { RoomStatus, BookingStatusFsm } from '@/lib/roomFsm';
@@ -23,6 +23,8 @@ interface ChatMessage {
 export default function AICopilotModal({ isOpen, onClose, onRefreshData }: AICopilotModalProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(getStoredApiKey());
+  const [showKeyConfig, setShowKeyConfig] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -230,6 +232,52 @@ export default function AICopilotModal({ isOpen, onClose, onRefreshData }: AICop
   return (
     <Modal open={isOpen} onClose={onClose} title="Front-Desk AI Copilot" maxWidth="max-w-2xl">
       <div className="flex flex-col h-[520px] -mx-6 -my-4">
+        {/* Status bar */}
+        <div className="px-6 py-2 bg-sky-50 border-b border-sky-100 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 text-sky-800">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-medium">
+              {apiKey ? 'Powered by Google Gemini Flash (Live AI)' : 'Running in Offline Smart NLP Mode'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowKeyConfig(!showKeyConfig)}
+            className="text-sky-700 hover:underline flex items-center gap-1 font-semibold"
+          >
+            <Key className="w-3 h-3" />
+            {showKeyConfig ? 'Close Key' : 'API Key'}
+          </button>
+        </div>
+
+        {showKeyConfig && (
+          <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs space-y-2">
+            <label className="font-semibold text-slate-700">Google Gemini API Key</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="AIzaSy... or AQ.Ab8..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="input text-xs flex-1 py-1"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setStoredApiKey(apiKey);
+                  setShowKeyConfig(false);
+                }}
+                className="btn btn-primary text-xs py-1 px-3"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              The project is pre-configured with your key. You can also supply a custom key here anytime.
+            </p>
+          </div>
+        )}
+
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
           {messages.map((msg) => (
