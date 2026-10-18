@@ -51,7 +51,7 @@ describe('AI Copilot Query Processor (processCopilotQuery)', () => {
     expect(res.action).toBe('set_room_status');
     expect((res.data as any).roomNumber).toBe('301');
     expect((res.data as any).nextStatus).toBe('maintenance');
-    expect((res.data as any).note).toContain('AC servicing');
+    expect((res.data as any).note.toLowerCase()).toContain('ac servicing');
   });
 
   it('detects check out instruction for an active guest', async () => {

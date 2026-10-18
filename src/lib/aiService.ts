@@ -296,11 +296,11 @@ Return ONLY valid JSON matching this schema:
   }
 
   // 2. Put Room In / Out of Maintenance
-  const maintMatch = q.match(/(?:put|place|set|move)?\s*(?:room\s+)?(\d{3})\s*(?:in|into|under|to)?\s*maintenance(?:\s+(?:for|due to|because)\s+(.+))?/i)
-    || q.match(/maintenance\s+(?:for\s+)?(?:room\s+)?(\d{3})(?:\s+(?:for|due to|because)\s+(.+))?/i);
+  const maintMatch = query.match(/(?:put|place|set|move)?\s*(?:room\s+)?(\d{3})\s*(?:in|into|under|to)?\s*maintenance(?:\s+(?:for|due to|because)\s+(.+))?/i)
+    || query.match(/maintenance\s+(?:for\s+)?(?:room\s+)?(\d{3})(?:\s+(?:for|due to|because)\s+(.+))?/i);
   if (maintMatch) {
     const roomNum = maintMatch[1];
-    const note = maintMatch[2] || 'Maintenance logged via AI Copilot';
+    const note = maintMatch[2]?.trim() || 'Maintenance logged via AI Copilot';
     const room = context.rooms.find((r) => r.room_number === roomNum);
     if (!room) return { action: 'general_reply', message: `Room ${roomNum} was not found.` };
     return {
