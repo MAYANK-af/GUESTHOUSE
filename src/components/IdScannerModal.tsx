@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Modal from './Modal';
-import { Camera, Upload, Sparkles, CheckCircle2, ShieldCheck, Key, RefreshCw } from 'lucide-react';
+import { Camera, Upload, Sparkles, CheckCircle2, ShieldCheck, Key, RefreshCw, AlertCircle } from 'lucide-react';
 import { extractIdDocument, getStoredApiKey, setStoredApiKey, type ExtractedIdData } from '@/lib/aiService';
 import { maskId } from '@/lib/identity';
 
@@ -14,6 +14,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
   const [scanning, setScanning] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedIdData | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState(getStoredApiKey());
   const [showKeyConfig, setShowKeyConfig] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,18 +24,24 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        setPreview(reader.result as string);
-        processScan(reader.result as string, 'aadhaar');
+        const base64 = reader.result as string;
+        setPreview(base64);
+        processScan(base64);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const processScan = async (base64: string, demoType: 'aadhaar' | 'passport' | 'driving_license') => {
+  const processScan = async (base64: string, demoType?: 'aadhaar' | 'passport' | 'driving_license') => {
     setScanning(true);
+    setError(null);
     try {
       const data = await extractIdDocument(base64, demoType);
       setExtracted(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to scan document.';
+      setError(msg);
+      setExtracted(null);
     } finally {
       setScanning(false);
     }
@@ -42,6 +49,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
 
   const runSample = (type: 'aadhaar' | 'passport' | 'driving_license') => {
     setPreview(null);
+    setError(null);
     processScan('', type);
   };
 
@@ -65,7 +73,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
           <div className="flex items-center gap-2 text-sky-800">
             <Sparkles className="w-4 h-4 text-sky-600 flex-shrink-0" />
             <span>
-              {apiKey ? 'Powered by Gemini 2.5 Flash Vision' : 'Running in Offline Smart OCR mode (zero setup needed)'}
+              {apiKey ? 'Powered by Gemini Multimodal Vision AI' : 'Running in Offline Smart OCR mode (zero setup needed)'}
             </span>
           </div>
           <button
@@ -80,11 +88,11 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
 
         {showKeyConfig && (
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-            <label className="font-medium text-slate-700">Optional Google Gemini API Key</label>
+            <label className="font-medium text-slate-700">Google Gemini API Key</label>
             <div className="flex gap-2">
               <input
                 type="password"
-                placeholder="AIzaSy..."
+                placeholder="AIzaSy... or AQ..."
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="input text-xs flex-1"
@@ -93,7 +101,7 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
                 Save
               </button>
             </div>
-            <p className="text-slate-400">Leave blank to use the built-in offline smart OCR extraction engine.</p>
+            <p className="text-slate-400">Stores directly in browser localStorage for secure client-side AI analysis.</p>
           </div>
         )}
 
@@ -102,13 +110,24 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
           {preview ? (
             <div className="space-y-3">
               <img src={preview} alt="Scanned ID" className="max-h-48 mx-auto rounded-lg shadow-sm" />
-              <button
-                type="button"
-                onClick={() => { setPreview(null); setExtracted(null); }}
-                className="btn btn-secondary text-xs"
-              >
-                Clear Image
-              </button>
+              <div className="flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setPreview(null); setExtracted(null); setError(null); }}
+                  className="btn btn-secondary text-xs"
+                >
+                  Clear Image
+                </button>
+                <button
+                  type="button"
+                  disabled={scanning}
+                  onClick={() => processScan(preview)}
+                  className="btn btn-primary text-xs flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
+                  Re-scan Image
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -176,11 +195,21 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
           </div>
         </div>
 
-        {/* Extraction Results */}
+        {/* Extraction Progress / Error */}
         {scanning && (
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center gap-3 text-sm text-slate-600">
             <RefreshCw className="w-5 h-5 text-sky-600 animate-spin" />
-            <span>Analyzing document with Multimodal Vision OCR...</span>
+            <span>Analyzing document with Gemini Multimodal Vision...</span>
+          </div>
+        )}
+
+        {error && !scanning && (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold">{error}</p>
+              <p className="text-amber-700">Please make sure the image is sharp and legible, or use one of the 1-click sample scans above.</p>
+            </div>
           </div>
         )}
 
@@ -198,30 +227,80 @@ export default function IdScannerModal({ isOpen, onClose, onScanComplete }: IdSc
 
             <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-lg border border-emerald-100">
               <div>
-                <span className="text-slate-400 block">Name:</span>
-                <span className="font-bold text-slate-800">{extracted.first_name} {extracted.last_name}</span>
+                <label className="text-slate-400 block mb-1">Name:</label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={extracted.first_name}
+                    onChange={(e) => setExtracted({ ...extracted, first_name: e.target.value })}
+                    className="input text-xs py-1 px-2 font-bold w-1/2"
+                    placeholder="First Name"
+                  />
+                  <input
+                    type="text"
+                    value={extracted.last_name}
+                    onChange={(e) => setExtracted({ ...extracted, last_name: e.target.value })}
+                    className="input text-xs py-1 px-2 font-bold w-1/2"
+                    placeholder="Last Name"
+                  />
+                </div>
               </div>
               <div>
-                <span className="text-slate-400 block">Document Type:</span>
-                <span className="font-semibold text-slate-800 uppercase">{extracted.id_type}</span>
+                <label className="text-slate-400 block mb-1">Document Type:</label>
+                <select
+                  value={extracted.id_type}
+                  onChange={(e) => setExtracted({ ...extracted, id_type: e.target.value as ExtractedIdData['id_type'] })}
+                  className="input text-xs py-1 px-2 font-semibold uppercase"
+                >
+                  <option value="aadhaar">AADHAAR</option>
+                  <option value="driving_license">DRIVING LICENCE</option>
+                  <option value="passport">PASSPORT</option>
+                  <option value="voter_id">VOTER ID</option>
+                  <option value="other">OTHER</option>
+                </select>
               </div>
               <div>
-                <span className="text-slate-400 block">Document Number:</span>
-                <span className="font-mono font-semibold text-slate-800">{maskId(extracted.id_type, extracted.id_number)}</span>
+                <label className="text-slate-400 block mb-1">Document Number:</label>
+                <input
+                  type="text"
+                  value={extracted.id_number}
+                  onChange={(e) => setExtracted({ ...extracted, id_number: e.target.value })}
+                  className="input text-xs py-1 px-2 font-mono font-semibold"
+                  placeholder="ID Number"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Masked preview: {maskId(extracted.id_type, extracted.id_number)}
+                </span>
               </div>
               <div>
-                <span className="text-slate-400 block">Company:</span>
-                <span className="font-semibold text-slate-800">{extracted.company || 'Individual'}</span>
+                <label className="text-slate-400 block mb-1">Company / Organization:</label>
+                <input
+                  type="text"
+                  value={extracted.company || ''}
+                  onChange={(e) => setExtracted({ ...extracted, company: e.target.value })}
+                  className="input text-xs py-1 px-2 font-semibold"
+                  placeholder="Individual / Company"
+                />
               </div>
               <div className="col-span-2">
-                <span className="text-slate-400 block">Address:</span>
-                <span className="text-slate-700">{extracted.address || '—'}</span>
+                <label className="text-slate-400 block mb-1">Address:</label>
+                <textarea
+                  rows={2}
+                  value={extracted.address || ''}
+                  onChange={(e) => setExtracted({ ...extracted, address: e.target.value })}
+                  className="input text-xs py-1 px-2 w-full resize-none"
+                  placeholder="Address"
+                />
               </div>
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-emerald-700">
               <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-              <span>Verhoeff mathematical checksum validated. Safe for guest registry.</span>
+              <span>
+                {extracted.id_type === 'aadhaar'
+                  ? 'Verhoeff mathematical checksum validated. Safe for guest registry.'
+                  : 'Document details parsed and verified. Safe for guest registry.'}
+              </span>
             </div>
           </div>
         )}
